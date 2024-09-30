@@ -223,7 +223,7 @@ int main(int argc, char* argv[]) {
 
         if (formVal.result == true) {
             std::cout << "s SATISFIABLE" << std::endl;
-            std::cout << "-v ";
+            std::cout << "v ";
             for (int i = 0; i < formVal.values.size(); i++) {
                 bool v = formVal.values[i];
                 if (!v) {
@@ -231,7 +231,7 @@ int main(int argc, char* argv[]) {
                 }
                 std::cout << (i + 1) << " ";
             }
-            std::cout << "" << std::endl;
+            std::cout << "0" << std::endl;
             return 0;
         }
     }
