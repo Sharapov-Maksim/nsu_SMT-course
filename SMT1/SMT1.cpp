@@ -236,6 +236,8 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    std::cout << "s UNSATISFIABLE" << std::endl;
+
     return 0;
 }
 
