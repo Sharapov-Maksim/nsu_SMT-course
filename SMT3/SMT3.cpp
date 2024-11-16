@@ -1,7 +1,4 @@
-﻿// SMT3.cpp: определяет точку входа для приложения.
-//
-
-using namespace std;
+﻿using namespace std;
 
 #include <iostream>
 #include <fstream>
@@ -174,7 +171,7 @@ public:
             auto idxValPair = values.find(varIdx);
             if (idxValPair != values.end()) {
                 bool varVal = idxValPair->second;
-                // Heuristic 3.2 remove disjunts already true
+                // heuristic 2: remove disjuncts already true
                 clauses.erase(std::remove_if(clauses.begin(), clauses.end(), [varIdx, varVal](Disjunct clause) {
                     // if disjunct contains variable with corresponding positiveness
                     return clause.containsVar(varIdx, varVal);
