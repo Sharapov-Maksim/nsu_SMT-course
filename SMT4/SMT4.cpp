@@ -163,7 +163,24 @@ class Formula {
             return false;
         }
 
-        //std::set<int> containedAtomicDisjincts() {}
+        /*
+        0 - not atomic
+        +<varIdx> - atomic positive variable
+        -<varIdx> - atomic negative variable
+        */
+        int atomicDisjunct() {
+            assert(literals.size() > 0);
+            if (literals.size() != 1) {
+                return 0;
+            }
+            Literal lit = literals[0];
+            if (lit.isPositive) {
+                return lit.index;
+            }
+            else {
+                return -1 * lit.index;
+            }
+        }
     };
 
 
@@ -245,6 +262,21 @@ public:
         return true;
     }
 
+    std::set<int> atomicNotAssignedDisjuncts() {
+        assert(clauses.size() > 0);
+        std::set<int> result = {};
+        for (Disjunct d : clauses) {
+            int atomic = d.atomicDisjunct();
+            if (atomic != 0) {
+                auto it = variablesNotAssigned.find(abs(atomic));
+                if (it != variablesNotAssigned.end()) {
+                    result.insert(atomic);
+                }
+            }
+        }
+        return result;
+    }
+
     // Copy Constructor
     Formula(const Formula& other) : variablesNotAssigned(other.variablesNotAssigned), clauses(other.clauses) {}
 };
@@ -301,20 +333,40 @@ std::vector<FormulaValue> solveIterative(Formula formula) {
         // if formula contains more variables 
         if (!currentVariableAssignment.f.variablesNotAssigned.empty()) {
             // find next variable to assign value
-            int index = *(currentVariableAssignment.f.variablesNotAssigned).begin();
+            int index;
+            std::set<int> atomicDisjuncts = currentVariableAssignment.f.atomicNotAssignedDisjuncts();
+            if (atomicDisjuncts.size() > 0) {
+                // heuristic 4 (lab 5): select some atomic disjunct, continue search for branch when it is true
+                int variableWithPositiveness = *atomicDisjuncts.begin();
+                index = abs(variableWithPositiveness);
+                bool positiveness = variableWithPositiveness > 0;
 
-            FormulaValue formulaWithVarTrue(currentVariableAssignment);
-            FormulaValue formulaWithVarFalse(currentVariableAssignment);
+                FormulaValue newFormula(currentVariableAssignment);
+                // Insert element into the map
+                auto insertionResult0 = newFormula.values.insert({ index, positiveness });
+                assert(insertionResult0.second); // check that inserted key did not exist before
 
-            // Insert element into the map
-            auto insertionResult0 = formulaWithVarTrue.values.insert({ index, true });
-            assert(insertionResult0.second); // check that inserted key did not exist before
-            auto insertionResult1 = formulaWithVarFalse.values.insert({ index, false });
-            assert(insertionResult1.second);
+                // push only one node
+                dfsStack->push(newFormula);
+            }
+            else {
+                index = *(currentVariableAssignment.f.variablesNotAssigned).begin();
+                FormulaValue formulaWithVarTrue(currentVariableAssignment);
+                FormulaValue formulaWithVarFalse(currentVariableAssignment);
 
-            // push left and right "nodes"
-            dfsStack->push(formulaWithVarTrue);
-            dfsStack->push(formulaWithVarFalse);
+                // Insert element into the map
+                auto insertionResult0 = formulaWithVarTrue.values.insert({ index, true });
+                assert(insertionResult0.second); // check that inserted key did not exist before
+                auto insertionResult1 = formulaWithVarFalse.values.insert({ index, false });
+                assert(insertionResult1.second);
+
+                // push left and right "nodes"
+                dfsStack->push(formulaWithVarTrue);
+                dfsStack->push(formulaWithVarFalse);
+            }
+
+            
+            
         }
     }
 
