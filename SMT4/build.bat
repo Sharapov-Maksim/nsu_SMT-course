@@ -5,5 +5,5 @@ cd build-dir
 cmake ..
 cmake --build . --config Release
 
-Release\SMT3.exe ..\..\Benchmark\2sat_test5.cnf
+Release\SMT4.exe ..\..\Benchmark\6cnf20_28000_28000_2.shuffled.cnf
 

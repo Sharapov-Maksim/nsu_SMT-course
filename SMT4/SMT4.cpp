@@ -143,6 +143,31 @@ class Formula {
             return false;
         }
 
+        /* 
+        heuristic 3 (lab 4): remove false literals from disjuncts
+        Returns true if no literals left after removing -> all of them were false -> whole formula false.
+
+        Implementation note: if all literals removed from disjunct this disjunct became invalid, no further processing of this disjunct should be made.
+        */
+        bool removeFalseLiterals(std::map<int, bool> values) {
+            assert(literals.size() > 0);
+            for (auto it = literals.begin(); it != literals.end(); ) {
+                auto idxValPair = values.find(it->index);
+                if (idxValPair != values.end()) {
+                    bool value = idxValPair->first;
+                    if (it->isPositive != value) {
+                        it = literals.erase(it);
+                    }
+                    else {
+                        ++it;
+                    }
+                }
+                else {
+                    ++it;
+                }
+            }
+            return literals.size() == 0;
+        }
 
         /* Returns false if disjunct can be evaluated to false. 
         Returns true - otherwise, when it is not enough values to evaluate to false, or evaluates to true. */
@@ -205,19 +230,31 @@ public:
         }
     }
 
-    void simplify(std::map<int, bool> values) {
+    /* Returns:
+    * 1 - if formula became true after simplification
+    * -1 - if formula became false after simplification
+    * 0 - if formula value is unknown
+    */
+    int simplify(std::map<int, bool> values) {
         for (const int& varIdx : variablesNotAssigned) {
             auto idxValPair = values.find(varIdx);
             if (idxValPair != values.end()) {
                 bool varVal = idxValPair->second;
-                // heuristic 2: remove disjuncts already true
+                // heuristic 2 (lab 3): remove disjuncts already true
                 clauses.erase(std::remove_if(clauses.begin(), clauses.end(), [varIdx, varVal](Disjunct clause) {
                     // if disjunct contains variable with corresponding positiveness
                     return clause.containsVar(varIdx, varVal);
                     }), clauses.end());
             }
         }
-
+        for (Disjunct disj : clauses) {
+            // heuristic 3 (lab 4): remove false literals from disjuncts
+            bool formulaIsFalse = disj.removeFalseLiterals(values);
+            if (formulaIsFalse) {
+                // heuristic 6 (my own): if disjunct simplified to false, then whole formula is false
+                return -1;
+            }
+        }
         // cleanup the variablesNotAssigned set
         for (const auto& idxValPair : values) {
             int idx = idxValPair.first;
@@ -226,6 +263,7 @@ public:
                 variablesNotAssigned.erase(it);
             }
         }
+        return 0;
     }
 
     bool isEvaluateble(std::map<int, bool> values) {
@@ -313,7 +351,19 @@ std::vector<FormulaValue> solveIterative(Formula formula) {
     {
         FormulaValue currentVariableAssignment = dfsStack->top();
         dfsStack->pop();
-        currentVariableAssignment.f.simplify(currentVariableAssignment.values);
+        int simplificationResult = currentVariableAssignment.f.simplify(currentVariableAssignment.values);
+        if (simplificationResult == -1) {
+            // formula already false, skip this decision tree branch
+            continue;
+        }
+        else if (simplificationResult == 1) {
+            // formula is true
+            results.push_back(currentVariableAssignment);
+            if (currentVariableAssignment.result) {
+                // heuristic 1 (lab 3): finish search on first positive result
+                return results;
+            }
+        }
         if (currentVariableAssignment.f.isEvaluateble(currentVariableAssignment.values)) {
             // formula is complete and can be evaluated
             currentVariableAssignment.result = currentVariableAssignment.f.eval(currentVariableAssignment.values);
@@ -326,7 +376,7 @@ std::vector<FormulaValue> solveIterative(Formula formula) {
         }
 
         if (currentVariableAssignment.f.partiallyEvaluate(currentVariableAssignment.values) == false) {
-            // heurisitc 3 (lab 4): formula evaluates to false, skip this decision tree branch
+            // heurisitc 5 (my own): formula evaluates to false, skip this decision tree branch
             continue;
         }
 
@@ -346,7 +396,7 @@ std::vector<FormulaValue> solveIterative(Formula formula) {
                 auto insertionResult0 = newFormula.values.insert({ index, positiveness });
                 assert(insertionResult0.second); // check that inserted key did not exist before
 
-                // push only one node
+                // push only one node, it will be simplified on next iteration
                 dfsStack->push(newFormula);
             }
             else {
