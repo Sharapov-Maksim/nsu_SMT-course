@@ -1,8 +1,8 @@
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
-import org.antlr.v4.runtime.tree.ParseTreeWalker
 import parser.SMTCommand
 import parser.SMTModelVisitor
+import parser.SMTScript
 import parser.gen.SMTLIBv2Lexer
 import parser.gen.SMTLIBv2Parser
 import java.io.File
@@ -24,12 +24,8 @@ fun main(args: Array<String>) {
     val parseTree = parser.start().script()
     val visitor = SMTModelVisitor()
     val smtCommands: MutableList<SMTCommand> = visitor.visit(parseTree)
+    val script = SMTScript(smtCommands)
 
+    println(smtCommands)
 
-    val name = "Kotlin"
-    println("Hello, $name!")
-
-    for (i in 1..5) {
-        println("i = $i")
-    }
 }
