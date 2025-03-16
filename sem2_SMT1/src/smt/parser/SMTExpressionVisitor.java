@@ -1,12 +1,11 @@
-package parser;
+package smt.parser;
 
 import java.util.List;
-import parser.Expression.FunApp;
-import parser.Expression.Identifier;
-import parser.gen.SMTLIBv2BaseVisitor;
-import parser.gen.SMTLIBv2Parser.Qual_identifierContext;
-import parser.gen.SMTLIBv2Parser.ScriptContext;
-import parser.gen.SMTLIBv2Parser.TermContext;
+import smt.parser.Expression.FunApp;
+import smt.parser.Expression.Identifier;
+import smt.parser.gen.SMTLIBv2BaseVisitor;
+import smt.parser.gen.SMTLIBv2Parser.Qual_identifierContext;
+import smt.parser.gen.SMTLIBv2Parser.TermContext;
 
 public class SMTExpressionVisitor extends SMTLIBv2BaseVisitor<Expression> {
 

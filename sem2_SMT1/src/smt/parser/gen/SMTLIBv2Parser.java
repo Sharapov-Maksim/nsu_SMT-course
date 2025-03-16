@@ -1,13 +1,10 @@
 // Generated from D:/projects/nsu_SMT-course/sem2_SMT1/resources/SMTLIBv2.g4 by ANTLR 4.13.2
-package parser.gen;
+package smt.parser.gen;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.misc.*;
 import org.antlr.v4.runtime.tree.*;
 import java.util.List;
-import java.util.Iterator;
-import java.util.ArrayList;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class SMTLIBv2Parser extends Parser {

@@ -1,5 +1,5 @@
 // Generated from D:/projects/nsu_SMT-course/sem2_SMT1/resources/SMTLIBv2.g4 by ANTLR 4.13.2
-package parser.gen;
+package smt.parser.gen;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
 /**

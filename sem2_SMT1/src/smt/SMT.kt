@@ -1,27 +1,6 @@
 package smt
 
-
-open class Sort(val name: String, val num: Int) {
-
-    class Void() : Sort("Void", -1)
-
-}
-
-open class UninterpretedFunction(val name: String, open val args: List<Sort>, val result: Sort) {
-
-    class Equal(override val args: List<Sort>) : UninterpretedFunction(name = "=", args = args, result = Sort.Void())
-    class Distinct(override val args: List<Sort>) : UninterpretedFunction(name = "distinct", args = args, result = Sort.Void())
-
-}
-
-open class Term {
-
-
-    open class FunctionApplication(f: UninterpretedFunction, val args: List<Term>)
-
-    //open class Equality() : FunctionApplication()
-
-}
+import java.util.Objects
 
 
 class Environment {
@@ -30,10 +9,12 @@ class Environment {
     val sorts: MutableMap<String, Sort> = mutableMapOf()
     val functions: MutableMap<String, UninterpretedFunction> = mutableMapOf()
 
-    //val equalities = mutableSetOf()
+    val asserts: MutableSet<Term.EqualityFunctionApplication> = mutableSetOf()
 
     fun addSort(sort: Sort) {
-        assert(sorts.containsKey(sort.name))
+        if(sorts.containsKey(sort.name)) {
+            throw IllegalArgumentException("Sort $sort was already added")
+        }
         sorts[sort.name] = sort
     }
 
@@ -42,11 +23,88 @@ class Environment {
 
 
     fun addFunction(function: UninterpretedFunction) {
-        assert(functions.containsKey(function.name))
+        if(functions.containsKey(function.name)) {
+            throw IllegalArgumentException("Function $function was already added")
+        }
         functions[function.name] = function
+    }
+
+    fun getFunction(name: String): UninterpretedFunction =
+        functions.getOrElse(name) { throw IllegalArgumentException("Unknown function $name") }
+
+
+    fun addAssert(term: Term.EqualityFunctionApplication) {
+        if (asserts.contains(term)) {
+            throw IllegalArgumentException("Term $term was already added")
+        }
+        asserts.add(term)
     }
 
 
 }
+
+
+data class Sort(val name: String, val num: Int) {
+
+    override fun toString(): String {
+        return "Sort($name)"
+    }
+}
+
+data class UninterpretedFunction(val name: String, val args: List<Sort>, val result: Sort) {
+    override fun toString(): String {
+        return "Function (\"$name\" $args -> $result)"
+    }
+}
+
+open class Term {
+
+    open class FunctionApplication(open val args: List<Term>): Term()
+    open class NamedFunctionApplication(
+        val f: UninterpretedFunction,
+        override val args: List<Term>): FunctionApplication(args) {
+
+        override fun equals(other: Any?): Boolean {
+            if (other !is NamedFunctionApplication) {
+                return false
+            }
+            if (this.f != other.f) {
+                return false
+            }
+            return super.equals(other)
+        }
+
+        override fun hashCode(): Int {
+            return javaClass.hashCode()
+        }
+
+    }
+
+    open class EqualityFunctionApplication(val isEqual: Boolean, override val args: List<Term>): FunctionApplication(args) {
+
+        override fun equals(other: Any?): Boolean {
+            if (!(other is EqualityFunctionApplication)) {
+                return false
+            }
+            if (this.isEqual != other.isEqual) {
+                return false
+            }
+            return super.equals(other)
+        }
+
+        companion object {
+            fun create(isEqual: Boolean, args: List<Term>): EqualityFunctionApplication {
+                if (args.size != 2) {
+                    throw IllegalArgumentException("Wrong ${ if (isEqual) "equality" else "inequality" } $args")
+                }
+                return EqualityFunctionApplication(isEqual, args)
+            }
+        }
+    }
+
+
+}
+
+
 
 

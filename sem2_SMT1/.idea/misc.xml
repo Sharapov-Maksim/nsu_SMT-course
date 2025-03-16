@@ -9,7 +9,7 @@
           <option name="outputDir" value="D:\projects\nsu_SMT-course\sem2_SMT1\src\" />
           <option name="libDir" value="" />
           <option name="encoding" value="" />
-          <option name="pkg" value="parser.gen" />
+          <option name="pkg" value="smt.parser.gen" />
           <option name="language" value="Java" />
           <option name="generateVisitor" value="true" />
         </PerGrammarGenerationSettings>

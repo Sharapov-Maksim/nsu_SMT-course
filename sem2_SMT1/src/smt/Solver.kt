@@ -1,13 +1,13 @@
+package smt
+
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
-import parser.SMTCommand
-import parser.SMTModelVisitor
-import parser.SMTScript
-import parser.gen.SMTLIBv2Lexer
-import parser.gen.SMTLIBv2Parser
-import smt.Environment
-import smt.Sort
-import smt.UninterpretedFunction
+import smt.parser.Expression
+import smt.parser.SMTCommand
+import smt.parser.SMTModelVisitor
+import smt.parser.SMTScript
+import smt.parser.gen.SMTLIBv2Lexer
+import smt.parser.gen.SMTLIBv2Parser
 import java.io.File
 
 
@@ -72,11 +72,15 @@ private fun interpretScript(script: SMTScript) {
     for (command in script.commands) {
         when (command) {
             is SMTCommand.CmdAssert -> {
-
-
-
+                val t = expressionToTerm(command.expression)
+                assert(t is Term.EqualityFunctionApplication) // only `=` or `distinct` on upper level of expression allowed
+                env.addAssert(t as Term.EqualityFunctionApplication)
             }
-            is SMTCommand.CmdCheckSat -> TODO()
+            is SMTCommand.CmdCheckSat -> {
+                val dag = CongruenceClosure.DAG.create(env.asserts.toList())
+                println(dag.graph)
+                TODO()
+            }
             is SMTCommand.CmdDeclareSort -> {
                 val sort = Sort(command.symbol, command.numeral)
                 env.addSort(sort)
@@ -93,6 +97,29 @@ private fun interpretScript(script: SMTScript) {
                 }
             }
 
+            else -> TODO()
         }
     }
 }
+
+/**
+ * Convert [Expression] (parser model) to [Term] (solver model)
+ */
+private fun expressionToTerm(exp: Expression): Term {
+    when (exp) {
+        is Expression.FunApp -> {
+            val args = exp.args.map(::expressionToTerm).toList()
+            val term = when (exp.identifier.value) {
+                "=" -> Term.EqualityFunctionApplication(true, args)
+                "distinct" -> Term.EqualityFunctionApplication(false, args)
+                else -> Term.NamedFunctionApplication(env.getFunction(exp.identifier.value), args)
+            }
+            return term
+        }
+        is Expression.Identifier -> {
+            return Term.NamedFunctionApplication(env.getFunction(exp.value), emptyList())
+        }
+        else -> throw NotImplementedError("Unsupported expression $exp")
+    }
+}
+

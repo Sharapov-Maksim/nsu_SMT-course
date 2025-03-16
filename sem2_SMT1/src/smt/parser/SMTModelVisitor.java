@@ -1,8 +1,8 @@
-package parser;
+package smt.parser;
 
 import java.util.List;
-import parser.gen.SMTLIBv2BaseVisitor;
-import parser.gen.SMTLIBv2Parser.ScriptContext;
+import smt.parser.gen.SMTLIBv2BaseVisitor;
+import smt.parser.gen.SMTLIBv2Parser.ScriptContext;
 
 public class SMTModelVisitor extends SMTLIBv2BaseVisitor<List<SMTCommand>> {
 

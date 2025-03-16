@@ -1,6 +1,6 @@
-package parser
+package smt.parser
 
-import parser.gen.SMTLIBv2Parser
+import smt.parser.gen.SMTLIBv2Parser
 
 data class SMTScript(val commands: List<SMTCommand>)
 
@@ -16,7 +16,7 @@ open class SMTCommand {
 
 open class Expression {
     data class FunApp(val identifier: Identifier, val args: List<Expression>) : Expression()
-    data class Identifier(val name: String) : Expression()
+    data class Identifier(val value: String) : Expression()
 }
 
 
