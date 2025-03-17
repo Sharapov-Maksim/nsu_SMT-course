@@ -15,7 +15,9 @@ class CongruenceClosure {
         val graph: MutableSet<Node> = mutableSetOf()
 
 
-        data class Node(val label: UninterpretedFunction, val edges: List<Node>)
+        data class Node(val label: UninterpretedFunction, val edges: List<Node>) {
+            var parent: Node = this // base state of Union-Find algorithm
+        }
 
 
         fun addNode(n: Node) {
@@ -46,6 +48,19 @@ class CongruenceClosure {
             }
         }
 
+    }
+
+    /**
+     * Implementation of Union-Find algorithm
+     */
+    class UnionFind {
+        companion object {
+            fun find(node: DAG.Node): DAG.Node = if (node.parent == node) node else find(node.parent)
+
+            fun union(x: DAG.Node, y: DAG.Node) {
+                find(y).parent = find(x) // works even if x ~ y already
+            }
+        }
     }
 
 
