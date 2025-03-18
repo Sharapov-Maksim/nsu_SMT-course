@@ -110,8 +110,8 @@ private fun expressionToTerm(exp: Expression): Term {
         is Expression.FunApp -> {
             val args = exp.args.map(::expressionToTerm).toList()
             val term = when (exp.identifier.value) {
-                "=" -> Term.EqualityFunctionApplication(true, args)
-                "distinct" -> Term.EqualityFunctionApplication(false, args)
+                "=" -> Term.EqualityFunctionApplication.create(true, args)
+                "distinct" -> Term.EqualityFunctionApplication.create(false, args)
                 else -> Term.NamedFunctionApplication(env.getFunction(exp.identifier.value), args)
             }
             return term

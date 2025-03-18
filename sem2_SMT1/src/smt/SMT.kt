@@ -59,8 +59,20 @@ data class UninterpretedFunction(val name: String, val args: List<Sort>, val res
 
 open class Term {
 
-    open class FunctionApplication(open val args: List<Term>): Term()
-    open class NamedFunctionApplication(
+    open class FunctionApplication(open val args: List<Term>): Term() {
+        override fun equals(other: Any?): Boolean {
+            if (other !is FunctionApplication) {
+                return false
+            }
+            return args == other.args
+        }
+
+        override fun hashCode(): Int {
+            return Objects.hash(args)
+        }
+    }
+
+    class NamedFunctionApplication(
         val f: UninterpretedFunction,
         override val args: List<Term>): FunctionApplication(args) {
 
@@ -75,12 +87,12 @@ open class Term {
         }
 
         override fun hashCode(): Int {
-            return javaClass.hashCode()
+            return Objects.hash(f, super.hashCode())
         }
 
     }
 
-    open class EqualityFunctionApplication(val isEqual: Boolean, override val args: List<Term>): FunctionApplication(args) {
+    class EqualityFunctionApplication private constructor(val isEqual: Boolean, override val args: List<Term>): FunctionApplication(args) {
 
         override fun equals(other: Any?): Boolean {
             if (!(other is EqualityFunctionApplication)) {
@@ -92,10 +104,14 @@ open class Term {
             return super.equals(other)
         }
 
+        override fun hashCode(): Int {
+            return Objects.hash(isEqual, super.hashCode())
+        }
+
         companion object {
             fun create(isEqual: Boolean, args: List<Term>): EqualityFunctionApplication {
                 if (args.size != 2) {
-                    throw IllegalArgumentException("Wrong ${ if (isEqual) "equality" else "inequality" } $args")
+                    throw IllegalArgumentException("Wrong ${ if (isEqual) "equality" else "inequality" } args $args")
                 }
                 return EqualityFunctionApplication(isEqual, args)
             }
