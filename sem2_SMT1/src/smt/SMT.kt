@@ -11,6 +11,9 @@ class Environment {
 
     val asserts: MutableSet<Term.EqualityFunctionApplication> = mutableSetOf()
 
+    fun equalities() = asserts.filter { x -> x.isEqual }
+    fun inequalities() = asserts.filter { x -> !x.isEqual }
+
     fun addSort(sort: Sort) {
         if(sorts.containsKey(sort.name)) {
             throw IllegalArgumentException("Sort $sort was already added")

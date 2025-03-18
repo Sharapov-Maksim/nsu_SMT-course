@@ -1,5 +1,7 @@
 package smt
 
+import smt.CongruenceClosure.UnionFind.Companion as UF
+
 class CongruenceClosure {
 
 
@@ -49,6 +51,62 @@ class CongruenceClosure {
 
             return n
         }
+
+        /**
+         * Determine if two nodes represent congruent subterms.
+         */
+        fun congruent(u: Node, v: Node): Boolean {
+            if ((u.label != v.label) || (u.edges.size != v.edges.size)) {
+                return false
+            }
+            for (i in 0 ..< u.edges.size) {
+                if (UF.find(u.edges[i]) != UF.find(v.edges[i])) {
+                    return false
+                }
+            }
+            return true
+        }
+
+        /**
+         * Merge uses the Union operation and additionally propagates functional congruence.
+         */
+        fun merge(u: Node, v: Node): Unit {
+            if (UF.find(u) != UF.find(v)) {
+                val predecessorsU = predecessors(u)
+                val predecessorsV = predecessors(v)
+
+                UF.union(u, v)
+
+                for (x in predecessorsU) {
+                    for (y in predecessorsV) {
+                        if (UF.find(x) != UF.find(y) && congruent(x, y)) {
+                            merge(x, y)
+                        }
+                    }
+                }
+            }
+
+        }
+
+        /**
+         * Find all congruent predecessors of node.
+         */
+        fun predecessors(x: Node): MutableList<Node> {
+            val direct = directPredecessors(x) // find direct predecessors of node
+            val allPredecessors = direct.toMutableList()
+
+            // recursively find predecessors of direct predecessors
+            // add them to the end of list
+            direct.forEach { dirPred -> allPredecessors += predecessors(dirPred) }
+            return allPredecessors
+        }
+
+        /**
+         * Find all direct predecessors of node [x] e.g. nodes with some edge that points to [x].
+         */
+        fun directPredecessors(x: Node): List<Node> =
+            termToNodeMap.values.filter { node -> node.edges.contains(x) }.toList()
+
 
         companion object {
             fun create(assertions: List<Term.EqualityFunctionApplication>): DAG {

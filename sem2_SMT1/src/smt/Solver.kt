@@ -9,9 +9,10 @@ import smt.parser.SMTScript
 import smt.parser.gen.SMTLIBv2Lexer
 import smt.parser.gen.SMTLIBv2Parser
 import java.io.File
+import smt.CongruenceClosure.UnionFind.Companion as UF
 
 
-val DEBUG_LOG = true
+val DEBUG_LOG = false
 
 fun readFileDirectlyAsText(fileName: String): String
         = File(fileName).readText(Charsets.UTF_8)
@@ -78,8 +79,28 @@ private fun interpretScript(script: SMTScript) {
             }
             is SMTCommand.CmdCheckSat -> {
                 val dag = CongruenceClosure.DAG.create(env.asserts.toList())
-                println(dag.graph)
-                TODO()
+                if (DEBUG_LOG) {
+                    println("Graph: ${dag.graph}")
+                }
+
+                // apply all equalities and propagate functional congruence
+                for (eq in env.equalities()) {
+                    val nodeLeft = dag.termToNode(eq.args[0])
+                    val nodeRight = dag.termToNode(eq.args[1])
+                    dag.merge(nodeLeft, nodeRight)
+                }
+
+                // check all inequalities
+                var sat = true
+                for (neq in env.inequalities()) {
+                    val nodeLeft = dag.termToNode(neq.args[0])
+                    val nodeRight = dag.termToNode(neq.args[1])
+                    if (UF.find(nodeLeft) == UF.find(nodeRight)) {
+                        sat = false
+                    }
+                }
+                println(if (sat) "sat" else "unsat")
+
             }
             is SMTCommand.CmdDeclareSort -> {
                 val sort = Sort(command.symbol, command.numeral)
