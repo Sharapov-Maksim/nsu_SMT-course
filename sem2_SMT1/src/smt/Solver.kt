@@ -20,7 +20,7 @@ fun readFileDirectlyAsText(fileName: String): String
 
 fun main(args: Array<String>) {
     if (args.isEmpty()) {
-        println("Usage: SolverKt <smt2_file_path>")
+        println("Usage: SMT_2_1 <file_path>.smt2")
         return
     }
 
