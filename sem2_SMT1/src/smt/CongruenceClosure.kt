@@ -72,8 +72,8 @@ class CongruenceClosure {
          */
         fun merge(u: Node, v: Node): Unit {
             if (UF.find(u) != UF.find(v)) {
-                val predecessorsU = predecessors(u)
-                val predecessorsV = predecessors(v)
+                val predecessorsU = congruentPredecessors(u)
+                val predecessorsV = congruentPredecessors(v)
 
                 UF.union(u, v)
 
@@ -90,6 +90,30 @@ class CongruenceClosure {
 
         /**
          * Find all congruent predecessors of node.
+         *
+         * Every congruence class has an associated set that contains all
+         * nodes that are predecessors to any node in the congruence class.
+         */
+        fun congruentPredecessors(x: Node): Set<Node> {
+            return congruenceClass(x)
+                .map(::predecessors)
+                .fold<MutableList<Node>, MutableSet<Node>>(mutableSetOf()) { acc, nodes -> acc += nodes; acc }
+                .toSet()
+        }
+
+        /**
+         * Find congruence class containing node [x].
+         */
+        fun congruenceClass(x: Node): Set<Node> =
+            termToNodeMap.values.filter { node -> UF.find(x) == UF.find(node) }.toSet()
+
+        /**
+         * Find all predecessors of node.
+         *
+         * TODO Every congruence class has an associated set that contains all
+         * nodes that are predecessors to any node in the congruence class.
+         *
+         * Построить мн-во всех предков всех вершин из класса эквивалентности
          */
         fun predecessors(x: Node): MutableList<Node> {
             val direct = directPredecessors(x) // find direct predecessors of node
