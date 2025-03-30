@@ -12,7 +12,7 @@ import java.io.File
 import smt.CongruenceClosure.UnionFind.Companion as UF
 
 
-val DEBUG_LOG = false
+const val DEBUG_LOG = true
 
 fun readFileDirectlyAsText(fileName: String): String
         = File(fileName).readText(Charsets.UTF_8)
@@ -20,7 +20,7 @@ fun readFileDirectlyAsText(fileName: String): String
 
 fun main(args: Array<String>) {
     if (args.isEmpty()) {
-        println("Usage: SMT_2_1 <file_path>.smt2")
+        println("Usage: SMT_2_2 <file_path>.smt2")
         return
     }
 
@@ -78,29 +78,9 @@ private fun interpretScript(script: SMTScript) {
                 env.addAssert(t as Term.EqualityFunctionApplication)
             }
             is SMTCommand.CmdCheckSat -> {
-                val dag = CongruenceClosure.DAG.create(env.asserts.toList())
-                if (DEBUG_LOG) {
-                    println("Graph: ${dag.graph}")
-                }
-
-                // apply all equalities and propagate functional congruence
-                for (eq in env.equalities()) {
-                    val nodeLeft = dag.termToNode(eq.args[0])
-                    val nodeRight = dag.termToNode(eq.args[1])
-                    dag.merge(nodeLeft, nodeRight)
-                }
-
-                // check all inequalities
-                var sat = true
-                for (neq in env.inequalities()) {
-                    val nodeLeft = dag.termToNode(neq.args[0])
-                    val nodeRight = dag.termToNode(neq.args[1])
-                    if (UF.find(nodeLeft) == UF.find(nodeRight)) {
-                        sat = false
-                    }
-                }
-                println(if (sat) "sat" else "unsat")
-
+                val dag = buildDAG()
+                val sat = checkSat(dag)
+                println(if (sat) "; sat" else "; unsat")
             }
             is SMTCommand.CmdDeclareSort -> {
                 val sort = Sort(command.symbol, command.numeral)
@@ -117,11 +97,50 @@ private fun interpretScript(script: SMTScript) {
                     error("Unsupported logic \"$logic\"")
                 }
             }
+            is SMTCommand.CmdGetModel -> {
+                val dag = buildDAG()
+                val sat = checkSat(dag)
+                if (!sat) {
+                    println("Could not find model values for unsatisfied model")
+                    continue
+                }
+                val classes = dag.congruenceClasses()
+                assert(false)
+            }
 
             else -> TODO()
         }
     }
 }
+
+private fun buildDAG(): CongruenceClosure.DAG {
+    val dag = CongruenceClosure.DAG.create(env.asserts.toList())
+    if (DEBUG_LOG) {
+        println("Graph: ${dag.graph}")
+    }
+
+    // apply all equalities and propagate functional congruence
+    for (eq in env.equalities()) {
+        val nodeLeft = dag.termToNode(eq.args[0])
+        val nodeRight = dag.termToNode(eq.args[1])
+        dag.merge(nodeLeft, nodeRight)
+    }
+    return dag
+}
+
+private fun checkSat(dag: CongruenceClosure.DAG): Boolean {
+    // check all inequalities
+    var sat = true
+    for (neq in env.inequalities()) {
+        val nodeLeft = dag.termToNode(neq.args[0])
+        val nodeRight = dag.termToNode(neq.args[1])
+        if (UF.find(nodeLeft) == UF.find(nodeRight)) {
+            sat = false
+        }
+    }
+    return sat
+}
+
 
 /**
  * Convert [Expression] (parser model) to [Term] (solver model)

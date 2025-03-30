@@ -9,6 +9,7 @@ open class SMTCommand {
     class CmdCheckSat() : SMTCommand()
     data class CmdDeclareSort(val symbol: String, val numeral: Int) : SMTCommand()
     data class CmdDeclareFun(val name: String, val args: List<String>, val res: String) : SMTCommand()
+    class CmdGetModel() : SMTCommand()
     data class CmdSetLogic(val logic: String) : SMTCommand()
 
 }
@@ -40,6 +41,7 @@ fun commandConstructor(com: SMTLIBv2Parser.CommandContext): SMTCommand {
             com.symbol(0).text,
             com.numeral().Numeral().text.toInt()
         )
+        com.cmd_getModel() != null -> SMTCommand.CmdGetModel()
         com.cmd_setLogic() != null -> SMTCommand.CmdSetLogic(com.symbol(0).text)
         else -> throw UnsupportedOperationException(com.text)
     }

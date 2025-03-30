@@ -53,6 +53,20 @@ class CongruenceClosure {
         }
 
         /**
+         * Converts term to node.
+         *
+         * @throws IllegalArgumentException if there is no node for such term.
+         */
+        fun termToExistingNode(t: Term): Node {
+            if (t !is Term.NamedFunctionApplication) {
+                throw UnsupportedOperationException("Unsupported term $t")
+            }
+            val n = termToNodeMap[t] ?: throw IllegalArgumentException("No such term in DAG: $t")
+
+            return n
+        }
+
+        /**
          * Determine if two nodes represent congruent subterms.
          */
         fun congruent(u: Node, v: Node): Boolean {
@@ -102,10 +116,25 @@ class CongruenceClosure {
         }
 
         /**
-         * Find congruence class containing node [x].
+         * Find congruence class of nodes containing node [x].
          */
         fun congruenceClass(x: Node): Set<Node> =
             termToNodeMap.values.filter { node -> UF.find(x) == UF.find(node) }.toSet()
+        /**
+         * Find congruence class containing node [x].
+         */
+        fun congruenceClass(t: Term): Set<Term> =
+            termToNodeMap.keys.filter { term ->
+                UF.find(termToExistingNode(t)) == UF.find(termToExistingNode(term))
+            }.toSet()
+
+        fun congruenceClasses(): Set<Set<Term>> {
+            val res: MutableSet<Set<Term>> = mutableSetOf()
+            termToNodeMap.keys.forEach { t ->
+                res.add(congruenceClass(t))
+            }
+            return res
+        }
 
         /**
          * Find all predecessors of node.
