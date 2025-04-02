@@ -104,7 +104,8 @@ private fun interpretScript(script: SMTScript) {
                     println("Could not find model values for unsatisfied model")
                     continue
                 }
-                val classes = dag.congruenceClasses()
+                findModel(dag)
+
                 assert(false)
             }
 
@@ -161,5 +162,85 @@ private fun expressionToTerm(exp: Expression): Term {
         }
         else -> throw NotImplementedError("Unsupported expression $exp")
     }
+}
+
+private fun findModel(dag: CongruenceClosure.DAG) {
+    val classes = dag.congruenceClasses()
+    val classesWithId = mutableMapOf<Int, MutableSet<Term>>()
+    // make an identifier for each congruence class
+    for ((id, cls) in classes.withIndex()) {
+        classesWithId[id] = cls.toMutableSet()
+    }
+
+    // build graph of congruence classes and color it
+    val g = GraphColoring.Graph()
+    for ((id, _) in classesWithId) {
+        g.addNode(id)
+    }
+    for (neq in env.inequalities()) {
+        val left = neq.args[0]
+        val right = neq.args[1]
+        val leftContainingEntry = classesWithId.filter { (id, cls) -> cls.contains(left) }.toList()
+        val rightContainingEntry = classesWithId.filter { (id, cls) -> cls.contains(right) }.toList()
+        assert(leftContainingEntry.size == 1) // only one class
+        assert(rightContainingEntry.size == 1) // only one class
+        val classIdLeft = leftContainingEntry.first().first
+        val classIdRight = rightContainingEntry.first().first
+
+        // add edge corresponding to inequality between congruence classes
+        g.addEdge(classIdLeft, classIdRight)
+    }
+
+    val colors = g.color()
+
+    assert(env.sorts.size == 1) // for now only single sort is supported
+
+    val variables = env.functions.values.filter { f -> f.args.isEmpty() } // variables are 0-ary functions
+    val classIdToValuesMap = colors.mapValues { (_, color) -> Model.SortValue(color) }
+
+    val model = Model(classIdToValuesMap.values.toSet())
+
+    // add variables to model
+    variables.forEach { variable ->
+        val containingClass = classesWithId.filter { (id, cls) -> cls.any { term: Term ->
+            (term is Term.NamedFunctionApplication) && term.f == variable
+        } }
+        assert(containingClass.size == 1)
+        val classId = containingClass.keys.first()
+        val value = classIdToValuesMap.getValue(classId)
+        model.addVarValue(variable, emptyList(), value)
+
+        // delete variable from congruence class to simplify model filling
+        classesWithId.getValue(classId).removeIf { term -> (term is Term.NamedFunctionApplication) && term.f == variable}
+    }
+
+    var height = 2
+    while (true) {
+
+        for ((id, cls) in classesWithId) {
+            val value = classIdToValuesMap.getValue(id)
+            val termsToAssignValue =
+                cls.filter { term: Term -> dag.heightOfSubGraph(dag.termToExistingNode(term)) == height }
+            termsToAssignValue.forEach { term: Term ->
+                if (term is Term.NamedFunctionApplication) {
+                    val functionCollection = env.functions.values.filter { f -> f == term.f }
+                    assert(functionCollection.size == 1)
+                    val function = functionCollection.first()
+                    model.addVarValue(function)
+                } else {
+                    throw IllegalStateException("Unknown term $term")
+                }
+            }
+
+
+        }
+
+        height++
+
+    }
+
+
+
+
 }
 

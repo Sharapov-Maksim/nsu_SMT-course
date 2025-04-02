@@ -160,6 +160,13 @@ class CongruenceClosure {
         fun directPredecessors(x: Node): List<Node> =
             termToNodeMap.values.filter { node -> node.edges.contains(x) }.toList()
 
+        /**
+         * Calculate height of subgraph growing from node [n].
+         */
+        fun heightOfSubGraph(n: Node): Int {
+            return 1 + (n.edges.maxOfOrNull { heightOfSubGraph(n) } ?: 0)
+        }
+
 
         companion object {
             fun create(assertions: List<Term.EqualityFunctionApplication>): DAG {
