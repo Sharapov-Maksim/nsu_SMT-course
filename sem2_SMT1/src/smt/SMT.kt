@@ -5,11 +5,16 @@ import java.util.Objects
 
 class Environment {
 
+    companion object {
+        const val EMPTY_LOGIC = ""
+    }
 
     val sorts: MutableMap<String, Sort> = mutableMapOf()
     val functions: MutableMap<String, UninterpretedFunction> = mutableMapOf()
 
     val asserts: MutableSet<Term.EqualityFunctionApplication> = mutableSetOf()
+
+    var logic: String = EMPTY_LOGIC
 
     fun equalities() = asserts.filter { x -> x.isEqual }
     fun inequalities() = asserts.filter { x -> !x.isEqual }
@@ -42,7 +47,6 @@ class Environment {
         }
         asserts.add(term)
     }
-
 
 }
 

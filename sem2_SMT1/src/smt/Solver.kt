@@ -96,6 +96,7 @@ private fun interpretScript(script: SMTScript) {
                 if (!logic.equals("QF_UF") && !logic.equals("QF_EUF")) {
                     error("Unsupported logic \"$logic\"")
                 }
+                env.logic = command.logic
             }
             is SMTCommand.CmdGetModel -> {
                 val dag = buildDAG()
@@ -164,7 +165,7 @@ private fun expressionToTerm(exp: Expression): Term {
     }
 }
 
-private fun findModel(dag: CongruenceClosure.DAG) {
+private fun findModel(dag: CongruenceClosure.DAG): Model {
     val classes = dag.congruenceClasses()
     val classesWithId = mutableMapOf<Int, MutableSet<Term>>()
     // make an identifier for each congruence class
@@ -201,7 +202,7 @@ private fun findModel(dag: CongruenceClosure.DAG) {
     val model = Model(classIdToValuesMap.values.toSet())
 
     // add variables to model
-    variables.forEach { variable ->
+    /*variables.forEach { variable ->
         val containingClass = classesWithId.filter { (id, cls) -> cls.any { term: Term ->
             (term is Term.NamedFunctionApplication) && term.f == variable
         } }
@@ -212,35 +213,46 @@ private fun findModel(dag: CongruenceClosure.DAG) {
 
         // delete variable from congruence class to simplify model filling
         classesWithId.getValue(classId).removeIf { term -> (term is Term.NamedFunctionApplication) && term.f == variable}
-    }
+    }*/
 
-    var height = 2
+    var height = 1 // variables have height of 1
     while (true) {
-
+        val classesBecameEmpty = mutableListOf<Int>()
         for ((id, cls) in classesWithId) {
             val value = classIdToValuesMap.getValue(id)
             val termsToAssignValue =
-                cls.filter { term: Term -> dag.heightOfSubGraph(dag.termToExistingNode(term)) == height }
+                cls.filter { term: Term -> dag.heightOfSubGraph(dag.termToExistingNode(term)) == height }.toSet()
             termsToAssignValue.forEach { term: Term ->
                 if (term is Term.NamedFunctionApplication) {
-                    val functionCollection = env.functions.values.filter { f -> f == term.f }
-                    assert(functionCollection.size == 1)
-                    val function = functionCollection.first()
-                    model.addVarValue(function)
+                    // add value for term with particular arguments to the model
+                    model.addFunApplicationValue(term, value)
                 } else {
                     throw IllegalStateException("Unknown term $term")
                 }
             }
+            // remove processed terms from worklist
+            cls.removeAll(termsToAssignValue)
+            if (cls.isEmpty()) {
+                classesBecameEmpty.add(id)
+            }
+        }
 
+        // remove classes became empty
+        classesBecameEmpty.forEach { id -> classesWithId.remove(id) }
 
+        if (classesWithId.isEmpty()) {
+            // nothing left for futher processing
+            break
         }
 
         height++
-
     }
 
-
-
-
+    if (DEBUG_LOG) {
+        println("Model: $model")
+    }
+    return model
 }
+
+
 

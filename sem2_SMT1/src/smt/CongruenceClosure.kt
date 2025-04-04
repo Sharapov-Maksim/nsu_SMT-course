@@ -164,7 +164,7 @@ class CongruenceClosure {
          * Calculate height of subgraph growing from node [n].
          */
         fun heightOfSubGraph(n: Node): Int {
-            return 1 + (n.edges.maxOfOrNull { heightOfSubGraph(n) } ?: 0)
+            return 1 + (n.edges.maxOfOrNull { e -> heightOfSubGraph(e) } ?: 0)
         }
 
 
