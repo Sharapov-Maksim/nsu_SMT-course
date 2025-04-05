@@ -12,7 +12,7 @@ import java.io.File
 import smt.CongruenceClosure.UnionFind.Companion as UF
 
 
-const val DEBUG_LOG = true
+const val DEBUG_LOG = false
 
 fun readFileDirectlyAsText(fileName: String): String
         = File(fileName).readText(Charsets.UTF_8)
@@ -105,9 +105,10 @@ private fun interpretScript(script: SMTScript) {
                     println("Could not find model values for unsatisfied model")
                     continue
                 }
-                findModel(dag)
+                env.assertsCongruenceClosure()
+                val model = findModel(dag)
+                ModelPrinter.printModel(model)
 
-                assert(false)
             }
 
             else -> TODO()

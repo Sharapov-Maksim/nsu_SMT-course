@@ -39,10 +39,10 @@ class ModelPrinter {
             }
 
             // all values should be distinct
-            for (x in valueNames.values) {
-                for (y in valueNames.values) {
-                    if (x != y) {
-                        println("(assert (distinct $x $y))")
+            for (x in valueNames.values.withIndex()) {
+                for (y in valueNames.values.withIndex()) {
+                    if (x.value != y.value && x.index <= y.index) {
+                        println("(assert (distinct ${x.value} ${y.value}))")
                     }
                 }
             }
@@ -57,39 +57,72 @@ class ModelPrinter {
                         res += "($argName ${singleSort.name})" // arguments
                     }
                     res += ") ${func.result.name}\n" // end of signature
-
-                    definition.values.forEach { argValues, resultValue ->
-                        when (argValues.size) {
-                            0 -> {
-                                assert(definition.values.size == 1) // variable
-                                res += valueNames.getValue(resultValue)
-                            }
-                            1 -> {
-                                res += "    (ite "
-                                argValues.withIndex().forEach { v -> res += "(= ${argNames[v.index]} ${valueNames.getValue(v.value)}" }
-                                res += ")"
-                            }
-                            else -> {
-                                res += "    (ite (^ "
-                                argValues.withIndex().forEach { v -> res += "(= ${argNames[v.index]} ${valueNames.getValue(v.value)}" }
-                                res += "))"
-                            }
-                        }
-
-                    }
-
+                    val sb = StringBuilder()
+                    appendValue(sb, definition.values.entries.toList(), valueNames, argNames, 0)
+                    res += sb.toString()
                 } finally {
                     res += ")"
                 }
-
+                println(res)
 
             }
+
+            println("(check-sat)")
+            println("(get-model)")
         }
 
-        fun appendValue (accumulator: String,
-                         entries: List<Map.Entry<List<Model. SortValue>, Model. SortValue>>,
-                         valueNames: Map<Model.SortValue, String>,
-                         argNames: List<String>) {}
+        /**
+         * @param index - index of entry
+         */
+        fun appendValue (
+            accumulator: StringBuilder,
+            entries: List<Map.Entry<List<Model. SortValue>, Model. SortValue>>,
+            valueNames: Map<Model.SortValue, String>,
+            argNames: List<String>,
+            index: Int) {
+            if (index > entries.size) {
+                return
+            }
+
+            if (index == entries.size) {
+                // last else branch, can be any value
+                accumulator.append("    " + valueNames.values.first())
+                return
+            }
+
+            val currentEntry = entries[index]
+            val args = currentEntry.key
+            val result = currentEntry.value
+
+            if (entries.size == 1) {
+                // can avoid using ite and just always use value from this args -> res pair
+                accumulator.append("    " + valueNames.getValue(result))
+                return
+            }
+
+            when (args.size) {
+                0 -> {
+                    assert(entries.size == 1) // variable
+                    accumulator.append("    " + valueNames.getValue(result))
+                }
+                1 -> {
+                    accumulator.append("    (ite ")
+                    args.withIndex().forEach { v -> accumulator.append("(= ${argNames[v.index]} ${valueNames.getValue(v.value)}) ") }
+                    accumulator.append(valueNames.getValue(result) + "\n")
+                    appendValue(accumulator, entries, valueNames, argNames, index + 1)
+                    accumulator.append(")")
+                }
+                else -> {
+                    accumulator.append("    (ite (^ ")
+                    args.withIndex().forEach { v -> accumulator.append("(= ${argNames[v.index]} ${valueNames.getValue(v.value)}) ") }
+                    accumulator.append(") ")
+                    accumulator.append(valueNames.getValue(result) + "\n")
+                    appendValue(accumulator, entries, valueNames, argNames, index + 1)
+                    accumulator.append(")")
+                }
+            }
+
+        }
     }
 
 

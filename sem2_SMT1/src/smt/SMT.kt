@@ -48,6 +48,32 @@ class Environment {
         asserts.add(term)
     }
 
+    // fix for inequalities problem
+    fun assertsCongruenceClosure() {
+        while (true) {
+            val inequalities = inequalities()
+            val sizePrevious = inequalities.size
+            for (ineq in inequalities) {
+                val left = ineq.args[0]
+                val right = ineq.args[1]
+                if ((left as Term.NamedFunctionApplication).f == (right as Term.NamedFunctionApplication).f) {
+                    if (left.args.size == 1) {
+                        asserts.add(
+                            Term.EqualityFunctionApplication.create(
+                                false,
+                                listOf(left.args.first(), right.args.first())
+                            )
+                        )
+                    }
+                }
+            }
+            if (inequalities().size == sizePrevious) {
+                // nothing added
+                break
+            }
+        }
+    }
+
 }
 
 
