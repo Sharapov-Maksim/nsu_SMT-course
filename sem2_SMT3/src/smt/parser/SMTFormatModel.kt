@@ -18,6 +18,7 @@ open class SMTCommand {
 open class Expression {
     data class FunApp(val identifier: Identifier, val args: List<Expression>) : Expression()
     data class Identifier(val value: String) : Expression()
+    data class DecimalConstant(val value: Double): Expression()
 }
 
 

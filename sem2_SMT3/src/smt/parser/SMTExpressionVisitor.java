@@ -1,10 +1,14 @@
 package smt.parser;
 
 import java.util.List;
+import smt.parser.Expression.DecimalConstant;
 import smt.parser.Expression.FunApp;
 import smt.parser.Expression.Identifier;
 import smt.parser.gen.SMTLIBv2BaseVisitor;
+import smt.parser.gen.SMTLIBv2Parser.DecimalContext;
+import smt.parser.gen.SMTLIBv2Parser.NumeralContext;
 import smt.parser.gen.SMTLIBv2Parser.Qual_identifierContext;
+import smt.parser.gen.SMTLIBv2Parser.Spec_constantContext;
 import smt.parser.gen.SMTLIBv2Parser.TermContext;
 
 public class SMTExpressionVisitor extends SMTLIBv2BaseVisitor<Expression> {
@@ -15,6 +19,8 @@ public class SMTExpressionVisitor extends SMTLIBv2BaseVisitor<Expression> {
         Identifier id;
         if (ctx.qual_identifier() != null) {
             id = (Identifier) ctx.qual_identifier().accept(this);
+        } else if (ctx.spec_constant() != null) {
+            return ctx.spec_constant().accept(this);
         } else {
             throw new UnsupportedOperationException(ctx.getText());
         }
@@ -41,5 +47,23 @@ public class SMTExpressionVisitor extends SMTLIBv2BaseVisitor<Expression> {
         String text = ctx.identifier().getText();
         assert (!text.isEmpty());
         return new Identifier(text);
+    }
+
+    @Override
+    public Expression visitSpec_constant(Spec_constantContext ctx) {
+        if (ctx.numeral() != null) {
+            ctx.numeral().accept(this);
+        }
+        return null;
+    }
+
+    @Override
+    public Expression visitNumeral(NumeralContext ctx) {
+        return new DecimalConstant(Integer.decode(ctx.Numeral().getText()).doubleValue());
+    }
+
+    @Override
+    public Expression visitDecimal(DecimalContext ctx) {
+        return new DecimalConstant(Double.parseDouble(ctx.getText()));
     }
 }
