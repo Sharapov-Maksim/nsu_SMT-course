@@ -6,7 +6,7 @@
         <PerGrammarGenerationSettings>
           <option name="fileName" value="$PROJECT_DIR$/resources/SMTLIBv2.g4" />
           <option name="autoGen" value="true" />
-          <option name="outputDir" value="D:\projects\nsu_SMT-course\sem2_SMT1\src\" />
+          <option name="outputDir" value="D:\projects\nsu_SMT-course\sem2_SMT3\src\" />
           <option name="libDir" value="" />
           <option name="encoding" value="" />
           <option name="pkg" value="smt.parser.gen" />

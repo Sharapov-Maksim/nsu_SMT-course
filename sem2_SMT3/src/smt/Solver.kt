@@ -2,16 +2,18 @@ package smt
 
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
-import smt.parser.Expression
 import smt.parser.SMTCommand
 import smt.parser.SMTModelVisitor
 import smt.parser.SMTScript
 import smt.parser.gen.SMTLIBv2Lexer
 import smt.parser.gen.SMTLIBv2Parser
+import smt.theory.rdl.Variable
+import smt.theory.rdl.LEQ_Apply
+import smt.theory.rdl.TheorySolverRDL
 import java.io.File
 
 
-const val DEBUG_LOG = false
+const val DEBUG_LOG = true
 
 fun readFileDirectlyAsText(fileName: String): String
         = File(fileName).readText(Charsets.UTF_8)
@@ -19,7 +21,7 @@ fun readFileDirectlyAsText(fileName: String): String
 
 fun main(args: Array<String>) {
     if (args.isEmpty()) {
-        println("Usage: SMT_2_2 <file_path>.smt2")
+        println("Usage: SMT_2_3 <file_path>.smt2")
         return
     }
 
@@ -66,33 +68,42 @@ private fun parseScript(content: String): SMTScript {
  * Contains all the entities needed for checking satisfiability of theory.
  */
 val env: Environment = Environment()
+fun rdl() = env.solverRDL()
+
 
 private fun interpretScript(script: SMTScript) {
 
     for (command in script.commands) {
         when (command) {
             is SMTCommand.CmdAssert -> {
-                TODO()
-                /*val t = expressionToTerm(command.expression)
-                assert(t is Term.EqualityFunctionApplication) // only `=` or `distinct` on upper level of expression allowed
-                env.addAssert(t as Term.EqualityFunctionApplication)*/
+                val leq = env.solverRDL().expressionToFuncApply(command.expression)
+                assert(leq is LEQ_Apply) // only `<=` on upper level of assert expression allowed
+                rdl().addAssert(leq as LEQ_Apply)
             }
             is SMTCommand.CmdCheckSat -> {
+                rdl().solve()
                 TODO()
+
                 //println(if (sat) "; sat" else "; unsat")
             }
             is SMTCommand.CmdDeclareSort -> {
                 throw UnsupportedOperationException("DeclareSort is unsupported")
             }
             is SMTCommand.CmdDeclareFun -> {
-                throw UnsupportedOperationException("DeclareFun is unsupported")
+                val args = command.args.map { s -> TheorySolverRDL.type(s) }.toList()
+                if (command.args.isNotEmpty()) {
+                    throw UnsupportedOperationException("Non-variable declarations are not supported. " +
+                            "Wrong declaration: $command")
+                }
+                val res = TheorySolverRDL.type(command.res)
+                env.solverRDL().addVariable(Variable(command.name, res))
             }
             is SMTCommand.CmdSetLogic -> {
                 val logic = command.logic
                 if (logic != "QF_RDL") {
                     error("Unsupported logic \"$logic\"")
                 }
-                env.logic = command.logic
+                env.createSolverRDL()
             }
             is SMTCommand.CmdGetModel -> {
                 TODO()
@@ -113,34 +124,15 @@ private fun interpretScript(script: SMTScript) {
 
 private fun checkSat(): Boolean {
     // check all inequalities
-    var sat = true
-    for (neq in env.inequalities()) {
-
-    }
-    return sat
+//    var sat = true
+//    for (neq in env.inequalities()) {
+//
+//    }
+    return false
 }
 
 
-/**
- * Convert [Expression] (parser model) to [Term] (solver model)
- */
-private fun expressionToTerm(exp: Expression): Term {
-    when (exp) {
-        is Expression.FunApp -> {
-            val args = exp.args.map(::expressionToTerm).toList()
-            val term = when (exp.identifier.value) {
-                "=" -> Term.EqualityFunctionApplication.create(true, args)
-                "distinct" -> Term.EqualityFunctionApplication.create(false, args)
-                else -> Term.NamedFunctionApplication(env.getFunction(exp.identifier.value), args)
-            }
-            return term
-        }
-        is Expression.Identifier -> {
-            return Term.NamedFunctionApplication(env.getFunction(exp.value), emptyList())
-        }
-        else -> throw NotImplementedError("Unsupported expression $exp")
-    }
-}
+
 
 private fun findModel(): Unit {
 

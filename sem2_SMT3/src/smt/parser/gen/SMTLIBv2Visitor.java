@@ -1,4 +1,4 @@
-// Generated from D:/projects/nsu_SMT-course/sem2_SMT1/resources/SMTLIBv2.g4 by ANTLR 4.13.2
+// Generated from D:/projects/nsu_SMT-course/sem2_SMT3/resources/SMTLIBv2.g4 by ANTLR 4.13.2
 package smt.parser.gen;
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 

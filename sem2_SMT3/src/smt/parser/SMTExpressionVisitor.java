@@ -18,17 +18,19 @@ public class SMTExpressionVisitor extends SMTLIBv2BaseVisitor<Expression> {
 
         Identifier id;
         if (ctx.qual_identifier() != null) {
-            id = (Identifier) ctx.qual_identifier().accept(this);
+            Expression some = ctx.qual_identifier().accept(this);
+            if (some instanceof DecimalConstant) {
+                return some;
+            } else {
+                id = (Identifier) some;
+            }
         } else if (ctx.spec_constant() != null) {
             return ctx.spec_constant().accept(this);
         } else {
             throw new UnsupportedOperationException(ctx.getText());
         }
 
-        // supported cases:
-        // | qual_identifier
-        // | ParOpen qual_identifier term+ ParClose
-        if (ctx.term().size() > 0) {
+        if (!ctx.term().isEmpty()) {
             List<Expression> args = ctx.term().stream()
                 .map(termContext -> termContext.accept(this))
                 .toList();
@@ -46,13 +48,30 @@ public class SMTExpressionVisitor extends SMTLIBv2BaseVisitor<Expression> {
     public Expression visitQual_identifier(Qual_identifierContext ctx) {
         String text = ctx.identifier().getText();
         assert (!text.isEmpty());
+        if (isNumeric(text)) {
+            return new DecimalConstant(Double.parseDouble(text));
+        }
         return new Identifier(text);
+    }
+
+    public static boolean isNumeric(String strNum) {
+        if (strNum == null) {
+            return false;
+        }
+        try {
+            double d = Double.parseDouble(strNum);
+        } catch (NumberFormatException nfe) {
+            return false;
+        }
+        return true;
     }
 
     @Override
     public Expression visitSpec_constant(Spec_constantContext ctx) {
         if (ctx.numeral() != null) {
-            ctx.numeral().accept(this);
+            return ctx.numeral().accept(this);
+        } else if (ctx.decimal() != null) {
+            return ctx.decimal().accept(this);
         }
         return null;
     }
