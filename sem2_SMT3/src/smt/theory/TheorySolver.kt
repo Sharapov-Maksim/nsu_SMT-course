@@ -6,9 +6,13 @@ interface TheorySolver {
         const val EMPTY_LOGIC = ""
     }
 
-    fun theoryName(): String
+    /**
+     * Solve the theory.
+     *
+     * @return true if theory is satisfiable.
+     */
+    fun solve(): Boolean
 
-
-
+    fun getModel(): Model
 
 }

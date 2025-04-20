@@ -9,12 +9,12 @@ interface TypeUF: Type
 /**
  * Used in QF_RDL.
  */
-object Real: TypeRDL
+data object Real: TypeRDL
 
 /**
  * Technical type.
  */
-object Void: TypeRDL
+data object Void: TypeRDL
 
 /**
  * Used in QF_UF. As a type for uninterpreted functions.

@@ -13,3 +13,4 @@
 (assert (<= (- x4 x2) 5))
 
 (check-sat)
+(get-model)

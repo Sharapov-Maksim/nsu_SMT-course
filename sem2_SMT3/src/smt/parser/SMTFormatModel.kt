@@ -42,6 +42,8 @@ fun commandConstructor(com: SMTLIBv2Parser.CommandContext): SMTCommand {
             com.symbol(0).text,
             com.numeral().Numeral().text.toInt()
         )
+        com.cmd_defineFun() != null ->
+            throw UnsupportedOperationException("define-fun command is not supported")
         com.cmd_getModel() != null -> SMTCommand.CmdGetModel()
         com.cmd_setLogic() != null -> SMTCommand.CmdSetLogic(com.symbol(0).text)
         else -> throw UnsupportedOperationException(com.text)

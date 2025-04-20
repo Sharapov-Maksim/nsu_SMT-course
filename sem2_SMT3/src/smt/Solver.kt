@@ -13,7 +13,7 @@ import smt.theory.rdl.TheorySolverRDL
 import java.io.File
 
 
-const val DEBUG_LOG = true
+const val DEBUG_LOG = false
 
 fun readFileDirectlyAsText(fileName: String): String
         = File(fileName).readText(Charsets.UTF_8)
@@ -81,16 +81,13 @@ private fun interpretScript(script: SMTScript) {
                 rdl().addAssert(leq as LEQ_Apply)
             }
             is SMTCommand.CmdCheckSat -> {
-                rdl().solve()
-                TODO()
-
-                //println(if (sat) "; sat" else "; unsat")
+                val sat = rdl().solve()
+                println(if (sat) "; sat" else "; unsat")
             }
             is SMTCommand.CmdDeclareSort -> {
                 throw UnsupportedOperationException("DeclareSort is unsupported")
             }
             is SMTCommand.CmdDeclareFun -> {
-                val args = command.args.map { s -> TheorySolverRDL.type(s) }.toList()
                 if (command.args.isNotEmpty()) {
                     throw UnsupportedOperationException("Non-variable declarations are not supported. " +
                             "Wrong declaration: $command")
@@ -106,15 +103,13 @@ private fun interpretScript(script: SMTScript) {
                 env.createSolverRDL()
             }
             is SMTCommand.CmdGetModel -> {
-                TODO()
-                /*val sat = checkSat()
+                val sat = rdl().solve()
                 if (!sat) {
                     println("Could not find model values for unsatisfied model")
                     continue
                 }
-                val model = findModel()
-                ModelPrinter.printModel(model)*/
-
+                val model = rdl().getModel()
+                println(TheorySolverRDL.modelToString(model))
             }
 
             else -> TODO()
@@ -122,26 +117,6 @@ private fun interpretScript(script: SMTScript) {
     }
 }
 
-private fun checkSat(): Boolean {
-    // check all inequalities
-//    var sat = true
-//    for (neq in env.inequalities()) {
-//
-//    }
-    return false
-}
-
-
-
-
-private fun findModel(): Unit {
-
-
-    /*if (DEBUG_LOG) {
-        println("Model: $model")
-    }
-    return model*/
-}
 
 
 

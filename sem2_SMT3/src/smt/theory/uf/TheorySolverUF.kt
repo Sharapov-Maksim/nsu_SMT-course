@@ -1,5 +1,6 @@
 package smt.theory.uf
 
+import smt.theory.Model
 import smt.theory.TheorySolver.Companion.EMPTY_LOGIC
 import smt.theory.Sort
 import smt.theory.TheorySolver
@@ -7,8 +8,13 @@ import smt.theory.TheorySolver
 class TheorySolverUF : TheorySolver {
 
 
-    override fun theoryName() = "QF_UF"
+    override fun solve(): Boolean {
+        TODO("Not yet implemented")
+    }
 
+    override fun getModel(): Model {
+        TODO("Not yet implemented")
+    }
 
     class State {
         val sorts: MutableMap<String, Sort> = mutableMapOf()

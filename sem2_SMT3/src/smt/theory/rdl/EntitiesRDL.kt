@@ -5,11 +5,7 @@ import smt.theory.TypeRDL
 /**
  * Abstract function defined with `declare-fun`.
  */
-data class Variable(val name: String, val result: TypeRDL) {
-    override fun toString(): String {
-        return "Var($name)"
-    }
-}
+data class Variable(val name: String, val result: TypeRDL)
 
 
 /**

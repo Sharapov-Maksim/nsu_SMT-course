@@ -2,14 +2,13 @@ package smt.theory.rdl
 
 import smt.DEBUG_LOG
 import smt.parser.Expression
-import smt.theory.Real
-import smt.theory.TypeRDL
-import smt.theory.Void
+import smt.theory.*
 
-class TheorySolverRDL {
+class TheorySolverRDL : TheorySolver {
 
     private val state = State()
     var graph: ConstraintGraph? = null
+    var searchResult: ConstraintGraph.SingleSourceShortestPath.SearchResult? = null
 
     class State {
 
@@ -24,10 +23,13 @@ class TheorySolverRDL {
         }
 
         /**
-         * Graph represented as set of nodes (organized as a map).
+         * Nodes contained in graph.
          */
         val nodes: MutableMap<Variable, Node> = mutableMapOf()
-
+        /**
+         * Edges contained in graph.
+         */
+        val edges: MutableSet<Edge> = mutableSetOf()
 
         init { // add root node at graph creation
             nodes[rootVariable] = Node(rootVariable)
@@ -36,35 +38,96 @@ class TheorySolverRDL {
         private val rootNode = nodes.getValue(rootVariable)
 
 
-        data class Node(val variable: Variable) {
+        data class Node(public val variable: Variable) {
             val edges: MutableSet<Edge> = mutableSetOf()
+
+            override fun toString(): String {
+                return "Node ${variable.name} ($edges)"
+            }
         }
 
         /**
          * Edge of oriented graph with weight
          */
-        data class Edge(val from: Node, val to: Node, val w: Double)
+        data class Edge(val from: Node, val to: Node, val w: Double) {
+            override fun toString(): String {
+                return "${from.variable.name} --($w)-> ${to.variable.name}"
+            }
+        }
 
 
         fun addNode(variable: Variable) {
             nodes.computeIfAbsent(variable) {
                 val newNode = Node(variable)
-                // add edge from root node with zero weight
-                rootNode.edges.add(Edge(rootNode, newNode, 0.0))
                 newNode
             }
+            // add edge from root node with zero weight
+            addEdge(rootVariable, variable, 0.0)
         }
 
         fun addEdge(from: Variable, to: Variable, weight: Double) {
             val left = nodes.getOrPut(from) { Node(from) }
             val right = nodes.getOrPut(to) { Node(from) }
-            left.edges.add(Edge(left, right, weight))
+            val e = Edge(left, right, weight)
+            left.edges.add(e)
+            edges.add(e)
+        }
+
+        fun searchShortestPathsFromRoot(): SingleSourceShortestPath.SearchResult {
+            return SingleSourceShortestPath(this).search(rootNode)
+        }
+
+        class SingleSourceShortestPath(private val graph: ConstraintGraph) {
+
+            data class SearchResult(val d: Map<Node, Double>, val hasNegativeCycle: Boolean)
+
+            /**
+             * Calculate distances to all nodes from [source] node.
+             */
+            fun search(source: Node): SearchResult {
+                val d: MutableMap<Node, Double> = mutableMapOf()
+                /*if (d.isNotEmpty()) {
+                    d = mutableMapOf()
+                }*/
+                for (v in graph.nodes.values) {
+                    d[v] = Double.MAX_VALUE;
+                }
+                d[source] = 0.0
+
+                for (i in 0 ..< graph.nodes.size - 1) {
+                    optimizeDistances(d)
+                }
+
+                // if there is no negative cycle in graph, optimization could not change anything
+                val hasNegativeCycle = optimizeDistances(d)
+
+                return SearchResult(d, hasNegativeCycle)
+            }
+
+            /**
+             * Cycle of distances optimization in Bellman–Ford algorithm.
+             *
+             * @return true if at least one of distances decreased.
+             */
+            private fun optimizeDistances(d: MutableMap<Node, Double>): Boolean {
+                var changed = false
+                for (e in graph.edges) {
+                    val w = e.from
+                    val v = e.to
+                    val weight = e.w
+                    if (d[v]!! > (d[w]!! + weight)) {
+                        d[v] = d[w]!! + weight
+                        changed = true
+                    }
+                }
+                return changed
+            }
+
         }
 
     }
 
-    fun solve() {
-
+    override fun solve(): Boolean {
         val graph = ConstraintGraph()
 
         // add all variables as nodes
@@ -82,13 +145,44 @@ class TheorySolverRDL {
         }
 
         if (DEBUG_LOG) {
-            println("RDL graph constructed: ${graph.nodes.values}")
+            println("[Info] RDL graph constructed: ${graph.nodes.values}")
         }
 
+        val searchResult = graph.searchShortestPathsFromRoot()
+
+        if (DEBUG_LOG) {
+            println("[Info] Search result: $searchResult")
+        }
+
+        val sat = !searchResult.hasNegativeCycle
+
         this.graph = graph
+        this.searchResult = searchResult
+
+        return sat
     }
 
+    /**
+     * Get model for theory. Theory should be already solved by [solve].
+     */
+    override fun getModel(): ModelRDL {
+        assert(this.searchResult != null)
+        val searchResult = this.searchResult!!
+        assert(!searchResult.hasNegativeCycle)
+        val d = searchResult.d.mapKeys { (node, _) -> node.variable }
+        val assignment: MutableMap<Variable, Double> = mutableMapOf()
 
+        state.variables.values.forEach {variable: Variable ->
+            val variableValue: Double
+            if (d.getValue(variable) == 0.0) {
+                variableValue = 0.0
+            } else {
+                variableValue = -1 * d.getValue(variable)
+            }
+            assignment[variable] = variableValue
+        }
+        return ModelRDL(assignment)
+    }
 
 
     fun addVariable(variable: Variable) {
@@ -147,6 +241,18 @@ class TheorySolverRDL {
                 else -> throw IllegalArgumentException("Unknown RDL type $name")
             }
         }
+
+        fun modelToString(model: ModelRDL): String {
+            var result = "(set-logic QF_RDL)\n"
+            model.variableValues.forEach { (variable, value) ->
+                result += "(define-fun ${variable.name} () ${variable.result}\n"
+                result += "    $value)\n"
+            }
+            result += "(check-sat)\n"
+            result += "(get-model)\n"
+            return result
+        }
+
     }
 
 
