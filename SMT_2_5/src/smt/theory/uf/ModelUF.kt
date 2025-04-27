@@ -1,6 +1,8 @@
 package smt.theory.uf
 
-data class ModelUF(val values: Set<SortValue>) {
+import smt.theory.Model
+
+data class ModelUF(val values: Set<SortValue>): Model {
 
     data class SortValue(val value: Int)
 

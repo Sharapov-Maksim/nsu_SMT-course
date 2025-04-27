@@ -1,13 +1,16 @@
 package smt.theory.uf
 
 import smt.DEBUG_LOG
-import smt.env
+import smt.parser.Expression
 import smt.theory.Model
 import smt.theory.TheorySolver.Companion.EMPTY_LOGIC
 import smt.theory.Sort
 import smt.theory.TheorySolver
 
 class TheorySolverUF : TheorySolver {
+
+    private val state = State()
+    private var dag: CongruenceClosure.DAG? = null
 
     class State {
         val sorts: MutableMap<String, Sort> = mutableMapOf()
@@ -80,26 +83,163 @@ class TheorySolverUF : TheorySolver {
 
 
     override fun solve(): Boolean {
-        TODO("Not yet implemented")
+        dag = buildDAG()
+        val sat = checkSat(dag!!)
+        return sat
     }
 
     override fun getModel(): Model {
-        TODO("Not yet implemented")
+        state.assertsCongruenceClosure()
+        assert(dag != null)
+        val model = findModel(dag!!)
+        return model
+    }
+
+    /**
+     * Convert [Expression] (parser model) to [Term] (solver model)
+     */
+    fun expressionToTerm(exp: Expression): Term {
+        when (exp) {
+            is Expression.FunApp -> {
+                val args = exp.args.map(::expressionToTerm).toList()
+                val term = when (exp.identifier.value) {
+                    "=" -> Term.EqualityFunctionApplication.create(true, args)
+                    "distinct" -> Term.EqualityFunctionApplication.create(false, args)
+                    else -> Term.NamedFunctionApplication(state.getFunction(exp.identifier.value), args)
+                }
+                return term
+            }
+            is Expression.Identifier -> {
+                return Term.NamedFunctionApplication(state.getFunction(exp.value), emptyList())
+            }
+            else -> throw NotImplementedError("Unsupported expression $exp")
+        }
     }
 
     private fun buildDAG(): CongruenceClosure.DAG {
-        val dag = CongruenceClosure.DAG.create(env.asserts.toList())
+        val dag = CongruenceClosure.DAG.create(state.asserts.toList())
         if (DEBUG_LOG) {
             println("Graph: ${dag.graph}")
         }
 
         // apply all equalities and propagate functional congruence
-        for (eq in env.equalities()) {
+        for (eq in state.equalities()) {
             val nodeLeft = dag.termToNode(eq.args[0])
             val nodeRight = dag.termToNode(eq.args[1])
             dag.merge(nodeLeft, nodeRight)
         }
         return dag
+    }
+
+    private fun findModel(dag: CongruenceClosure.DAG): ModelUF {
+        val classes = dag.congruenceClasses()
+        val classesWithId = mutableMapOf<Int, MutableSet<Term>>()
+        // make an identifier for each congruence class
+        for ((id, cls) in classes.withIndex()) {
+            classesWithId[id] = cls.toMutableSet()
+        }
+
+        // build graph of congruence classes and color it
+        val g = GraphColoring.Graph()
+        for ((id, _) in classesWithId) {
+            g.addNode(id)
+        }
+        for (neq in state.inequalities()) {
+            val left = neq.args[0]
+            val right = neq.args[1]
+            val leftContainingEntry = classesWithId.filter { (id, cls) -> cls.contains(left) }.toList()
+            val rightContainingEntry = classesWithId.filter { (id, cls) -> cls.contains(right) }.toList()
+            assert(leftContainingEntry.size == 1) // only one class
+            assert(rightContainingEntry.size == 1) // only one class
+            val classIdLeft = leftContainingEntry.first().first
+            val classIdRight = rightContainingEntry.first().first
+
+            // add edge corresponding to inequality between congruence classes
+            g.addEdge(classIdLeft, classIdRight)
+        }
+
+        val colors = g.color()
+
+        assert(state.sorts.size == 1) // for now only single sort is supported
+
+        val variables = state.functions.values.filter { f -> f.args.isEmpty() } // variables are 0-ary functions
+        val classIdToValuesMap = colors.mapValues { (_, color) -> ModelUF.SortValue(color) }
+
+        val model = ModelUF(classIdToValuesMap.values.toSet())
+
+        var height = 1 // variables have height of 1
+        while (true) {
+            val classesBecameEmpty = mutableListOf<Int>()
+            for ((id, cls) in classesWithId) {
+                val value = classIdToValuesMap.getValue(id)
+                val termsToAssignValue =
+                    cls.filter { term: Term -> dag.heightOfSubGraph(dag.termToExistingNode(term)) == height }.toSet()
+                termsToAssignValue.forEach { term: Term ->
+                    if (term is Term.NamedFunctionApplication) {
+                        // add value for term with particular arguments to the model
+                        model.addFunApplicationValue(term, value)
+                    } else {
+                        throw IllegalStateException("Unknown term $term")
+                    }
+                }
+                // remove processed terms from worklist
+                cls.removeAll(termsToAssignValue)
+                if (cls.isEmpty()) {
+                    classesBecameEmpty.add(id)
+                }
+            }
+
+            // remove classes became empty
+            classesBecameEmpty.forEach { id -> classesWithId.remove(id) }
+
+            if (classesWithId.isEmpty()) {
+                // nothing left for futher processing
+                break
+            }
+
+            height++
+        }
+
+        if (DEBUG_LOG) {
+            println("Model: $model")
+        }
+        return model
+    }
+
+    public fun variableEqualityClasses(): Set<Set<Term>> {
+        val dag = dag?: throw IllegalStateException("DAG is null")
+        val classes = dag.congruenceClasses()
+        val varClasses = mutableSetOf<Set<Term>>()
+
+        for (cls in classes) {
+            val varClass =
+                cls.filter { term: Term -> dag.heightOfSubGraph(dag.termToExistingNode(term)) == 1 } // variables
+                    .toSet()
+            if (varClass.isNotEmpty()) {
+                varClasses += varClass
+            }
+        }
+        return varClasses
+    }
+
+
+    private fun checkSat(dag: CongruenceClosure.DAG): Boolean {
+        // check all inequalities
+        var sat = true
+        for (neq in state.inequalities()) {
+            val nodeLeft = dag.termToNode(neq.args[0])
+            val nodeRight = dag.termToNode(neq.args[1])
+            if (CongruenceClosure.UnionFind.find(nodeLeft) == CongruenceClosure.UnionFind.find(nodeRight)) {
+                sat = false
+            }
+        }
+        return sat
+    }
+
+
+
+    fun addAssert(term: Term.EqualityFunctionApplication) {
+        state.addAssert(term)
     }
 
 }

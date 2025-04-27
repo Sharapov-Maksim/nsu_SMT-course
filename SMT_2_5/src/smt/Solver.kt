@@ -2,14 +2,18 @@ package smt
 
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
+import smt.parser.Expression
 import smt.parser.SMTCommand
 import smt.parser.SMTModelVisitor
 import smt.parser.SMTScript
 import smt.parser.gen.SMTLIBv2Lexer
 import smt.parser.gen.SMTLIBv2Parser
+import smt.theory.Theory
+import smt.theory.TheorySolver
 import smt.theory.rdl.Variable
 import smt.theory.rdl.LEQ_Apply
 import smt.theory.rdl.TheorySolverRDL
+import smt.theory.uf.Term
 import java.io.File
 
 
@@ -70,6 +74,7 @@ private fun parseScript(content: String): SMTScript {
 val env: Environment = Environment()
 fun rdl() = env.solverRDL()
 fun uf() = env.solverUF()
+fun ufrdl() = env.solverUFRDL()
 
 
 private fun interpretScript(script: SMTScript) {
@@ -77,9 +82,22 @@ private fun interpretScript(script: SMTScript) {
     for (command in script.commands) {
         when (command) {
             is SMTCommand.CmdAssert -> {
-                val leq = env.solverRDL().expressionToFuncApply(command.expression)
-                assert(leq is LEQ_Apply) // only `<=` on upper level of assert expression allowed
-                rdl().addAssert(leq as LEQ_Apply)
+                if (command.expression !is Expression.FunApp) {
+                    throw UnsupportedOperationException("Unsupported expression ${command.expression}")
+                }
+                when (classifyExpression(command.expression)) { // 1. UF and RDL fill
+                    Theory.RDL -> {
+                        val leq = rdl().expressionToFuncApply(command.expression)
+                        assert(leq is LEQ_Apply) // only `<=` on upper level of assert expression allowed
+                        rdl().addAssert(leq as LEQ_Apply)
+                    }
+                    Theory.UF -> {
+                        val t = uf().expressionToTerm(command.expression)
+                        assert(t is Term.EqualityFunctionApplication) // only `=` or `distinct` on upper level of expression allowed
+                        uf().addAssert(t as Term.EqualityFunctionApplication)
+                    }
+                    else -> error("Should not reach here")
+                }
             }
             is SMTCommand.CmdCheckSat -> {
                 val sat = rdl().solve()
@@ -97,11 +115,23 @@ private fun interpretScript(script: SMTScript) {
                 env.solverRDL().addVariable(Variable(command.name, res))
             }
             is SMTCommand.CmdSetLogic -> {
-                val logic = command.logic
-                if (logic != "QF_RDL") {
-                    error("Unsupported logic \"$logic\"")
+                when (val logic = command.logic) {
+                    /*"QF_RDL" -> {
+                        env.createSolverRDL()
+                        env.theory = Theory.RDL
+                    }
+                    "QF_UF" -> {
+                        env.createSolverUF()
+                        env.theory = Theory.UF
+                    }*/
+                    "QF_UFRDL" -> {
+                        env.createSolverRDL()
+                        env.createSolverUF()
+                        env.createSolverUFRDL(uf(), rdl())
+                        env.theory = Theory.UFRDL
+                    }
+                    else -> error("Unsupported logic \"$logic\"")
                 }
-                env.createSolverRDL()
             }
             is SMTCommand.CmdGetModel -> {
                 val sat = rdl().solve()
@@ -118,6 +148,16 @@ private fun interpretScript(script: SMTScript) {
     }
 }
 
+
+fun classifyExpression(exp: Expression.FunApp): Theory {
+    val res = when (exp.identifier.value) {
+        "<=" -> Theory.RDL
+        "=" -> Theory.UF
+        "distinct" -> Theory.UF
+        else -> throw IllegalArgumentException("Could not classify expression $exp")
+    }
+    return res
+}
 
 
 
