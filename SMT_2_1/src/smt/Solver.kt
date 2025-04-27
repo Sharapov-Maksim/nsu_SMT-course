@@ -116,7 +116,20 @@ private fun interpretScript(script: SMTScript) {
     }
 }
 
+private fun buildDAG(): CongruenceClosure.DAG {
+    val dag = CongruenceClosure.DAG.create(env.asserts.toList())
+    if (DEBUG_LOG) {
+        println("Graph: ${dag.graph}")
+    }
 
+    // apply all equalities and propagate functional congruence
+    for (eq in env.equalities()) {
+        val nodeLeft = dag.termToNode(eq.args[0])
+        val nodeRight = dag.termToNode(eq.args[1])
+        dag.merge(nodeLeft, nodeRight)
+    }
+    return dag
+}
 
 private fun checkSat(dag: CongruenceClosure.DAG): Boolean {
     // check all inequalities
