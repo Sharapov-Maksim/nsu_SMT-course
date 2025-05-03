@@ -17,7 +17,7 @@ class TheorySolverRDL : TheorySolver {
 
     }
 
-    class ConstraintGraph() {
+    open class ConstraintGraph() {
         companion object {
             val rootVariable = Variable("ROOT", Void)
         }
@@ -29,7 +29,13 @@ class TheorySolverRDL : TheorySolver {
         /**
          * Edges contained in graph.
          */
-        val edges: MutableSet<Edge> = mutableSetOf()
+        open val edges: MutableSet<Edge> = mutableSetOf()
+
+        class InducedGraph(baseGraph: ConstraintGraph): ConstraintGraph() {
+
+            
+
+        }
 
         init { // add root node at graph creation
             nodes[rootVariable] = Node(rootVariable)
@@ -182,6 +188,27 @@ class TheorySolverRDL : TheorySolver {
             assignment[variable] = variableValue
         }
         return ModelRDL(assignment)
+    }
+
+    class EqGen(val delta: Map<ConstraintGraph.Node, Double>, val graph: ConstraintGraph) {
+
+        fun findEqualVariables() {
+            val edgesWithZeroSlack = graph.edges.filter { sl(it) == 0.0 } // E'
+
+
+        }
+
+        /**
+         * Slack function.
+         */
+        private fun sl(u: ConstraintGraph.Node, v: ConstraintGraph.Node): Double =
+            delta.getValue(u) - delta.getValue(v) + edge(u, v).w
+
+        private fun sl(edge: ConstraintGraph.Edge) = sl(edge.from, edge.to)
+
+        private fun edge(u: ConstraintGraph.Node, v: ConstraintGraph.Node) =
+            u.edges.filter { e -> e.from == u && e.to == v }[0]
+
     }
 
 
