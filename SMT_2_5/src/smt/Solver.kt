@@ -14,6 +14,7 @@ import smt.theory.rdl.Variable
 import smt.theory.rdl.LEQ_Apply
 import smt.theory.rdl.TheorySolverRDL
 import smt.theory.uf.Term
+import smt.theory.uf.UninterpretedFunction
 import java.io.File
 
 
@@ -100,7 +101,7 @@ private fun interpretScript(script: SMTScript) {
                 }
             }
             is SMTCommand.CmdCheckSat -> {
-                val sat = rdl().solve()
+                val sat = ufrdl().solve()
                 println(if (sat) "; sat" else "; unsat")
             }
             is SMTCommand.CmdDeclareSort -> {
@@ -108,11 +109,16 @@ private fun interpretScript(script: SMTScript) {
             }
             is SMTCommand.CmdDeclareFun -> {
                 if (command.args.isNotEmpty()) {
-                    throw UnsupportedOperationException("Non-variable declarations are not supported. " +
-                            "Wrong declaration: $command")
+                    // add uninterpreted function to UF
+                    val args = command.args.map { s -> TheorySolverRDL.type(s) }.toList()
+                    val res = TheorySolverRDL.type(command.res)
+                    uf().addFunction(UninterpretedFunction(command.name, args, res))
+                } else {
+                    // add variable to both UF and RDL
+                    val res = TheorySolverRDL.type(command.res)
+                    rdl().addVariable(Variable(command.name, res))
+                    uf().addFunction(UninterpretedFunction(command.name, emptyList(), res))
                 }
-                val res = TheorySolverRDL.type(command.res)
-                env.solverRDL().addVariable(Variable(command.name, res))
             }
             is SMTCommand.CmdSetLogic -> {
                 when (val logic = command.logic) {

@@ -1,6 +1,8 @@
 package smt.theory.uf
 
 import smt.theory.Sort
+import smt.theory.TheorySolver
+import smt.uf
 import kotlin.enums.EnumEntries
 
 class ModelPrinter {
@@ -9,8 +11,8 @@ class ModelPrinter {
         const val SORT_VALUE_INFIX = "_VALUE_"
 
         fun printModel(model: ModelUF) {
-            if (env.logic != Environment.EMPTY_LOGIC) {
-                println("(set-logic ${env.logic})")
+            /*if (uf().state.logic != TheorySolver.EMPTY_LOGIC) {
+                println("(set-logic ${.logic})")
             }
             env.sorts.forEach { (name, sort) ->
                 println("(declare-sort $name ${sort.num})")
@@ -19,7 +21,7 @@ class ModelPrinter {
             if (model.values.isNotEmpty() && env.sorts.size != 1) {
                 throw UnsupportedOperationException("Models with values of multiple (or zero) sorts are unsupported. " +
                         "Sorts: ${env.sorts}")
-            }
+            }*/
 
             if (model.values.isEmpty()) {
                 assert(model.functionDefinitions.isEmpty())
@@ -29,7 +31,8 @@ class ModelPrinter {
                 return
             }
 
-            val singleSort: Sort = env.sorts.values.first()
+            /*val singleSort: Sort =
+                env.sorts.values.first()
 
             val valueNames: Map<ModelUF.SortValue, String> =
                 model.values.associateWith { "${singleSort.name}$SORT_VALUE_INFIX${it.value}" }
@@ -69,7 +72,7 @@ class ModelPrinter {
             }
 
             println("(check-sat)")
-            println("(get-model)")
+            println("(get-model)")*/
         }
 
         /**

@@ -39,6 +39,13 @@ class TheorySolverUFRDL(val uf: TheorySolverUF, val rdl: TheorySolverRDL): Theor
         if (!rdlSat) {
             return false
         }
+        val equalVariablesSets = rdl().getEqualVariables()
+        for (eqClass in equalVariablesSets) {
+            if (eqClass.size >= 2) {
+
+            }
+        }
+
 
 
         TODO("Not yet implemented")
@@ -72,6 +79,10 @@ class TheorySolverUFRDL(val uf: TheorySolverUF, val rdl: TheorySolverRDL): Theor
         }
 
         addEqualities(tail) // recursively add all combinations from tail
+    }
+
+    private fun addEqualitiesUF(cls: List<Variable>) {
+        // Term.EqualityFunctionApplication.create(true, args)
     }
 
     /**

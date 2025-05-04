@@ -29,16 +29,48 @@ class TheorySolverRDL : TheorySolver {
         /**
          * Edges contained in graph.
          */
-        open val edges: MutableSet<Edge> = mutableSetOf()
-
-        class InducedGraph(baseGraph: ConstraintGraph): ConstraintGraph() {
-
-            
-
-        }
+        val edges: MutableSet<Edge> = mutableSetOf()
 
         init { // add root node at graph creation
             nodes[rootVariable] = Node(rootVariable)
+        }
+
+        open fun edgesFrom(n: Node): Set<Edge> = n.edges
+
+        /**
+         * Graph induced by subset of edges.
+         */
+        class InducedGraph private constructor(val baseGraph: ConstraintGraph, val edgesInduced: Set<Edge>): ConstraintGraph() {
+
+            companion object {
+                fun create(baseGraph: ConstraintGraph, edgesInduced: Set<Edge>): InducedGraph {
+                    if (!baseGraph.edges.containsAll(edgesInduced)) {
+                        throw IllegalArgumentException("Wrong edges subset, $edgesInduced is not subset of ${baseGraph.edges}")
+                    }
+                    return InducedGraph(baseGraph, edgesInduced)
+                }
+            }
+
+            /**
+             * Returns outgoing edges contained in induced set of edges.
+             */
+            override fun edgesFrom(n: Node): Set<Edge> {
+                return baseGraph.edgesFrom(n).filter { edgesInduced.contains(it) }.toSet()
+            }
+
+        }
+
+        /**
+         * Graph with inverted edges.
+         *
+         * @see SCC
+         */
+        class InvertedGraph(val baseGraph: ConstraintGraph): ConstraintGraph() {
+            private val edgesInverted = baseGraph.edges.map { e -> Edge(e.to, e.from, e.w) }.toSet()
+
+            override fun edgesFrom(n: Node): Set<Edge> {
+                return edgesInverted.filter { it.from == n }.toSet()
+            }
         }
 
         private val rootNode = nodes.getValue(rootVariable)
@@ -131,6 +163,66 @@ class TheorySolverRDL : TheorySolver {
 
         }
 
+        /**
+         * Strong connected components finder.
+         *
+         * http://e-maxx.ru/algo/strong_connected_components
+         */
+        class SCC {
+            companion object {
+                /**
+                 * Search SCCs from [graph].
+                 * @return mapping of node to SCC index.
+                 */
+                fun search(graph: ConstraintGraph): Map<Node, Int> {
+                    val graphInverted = InvertedGraph(graph)
+                    val ord = ArrayDeque<Node>() // order in which DFS1 finishes traversal
+                    val visited = mutableSetOf<Node>()
+
+                    for (node in graph.nodes.values) {
+                        dfsWithOrder(graph, node, visited, ord)
+                    }
+
+                    val components: MutableMap<Node, Int> = mutableMapOf()
+                    var sccIdx = 0
+                    var node = ord.removeLastOrNull()
+                    while (node != null)  {
+                        if (!components.containsKey(node)) {
+                            dfsMarkComponents(graphInverted, node, components, sccIdx)
+                            sccIdx++
+                        }
+                        node = ord.removeLastOrNull()
+                    }
+
+                    return components
+                }
+
+                private fun dfsWithOrder(graph: ConstraintGraph, start: Node, visited: MutableSet<Node>, ord: ArrayDeque<Node>) {
+                    if(visited.contains(start)) {
+                        return
+                    }
+                    visited += start
+                    for (edge in graph.edgesFrom(start)) {
+                        if (!visited.contains(edge.to)) {
+                            dfsWithOrder(graph, edge.to, visited, ord)
+                        }
+                    }
+                    ord.addLast(start)
+                }
+
+                private fun dfsMarkComponents(graph: ConstraintGraph, start: Node, components: MutableMap<Node, Int>, compIdx: Int) {
+                    assert(!components.containsKey(start))
+                    components[start] = compIdx
+
+                    for (edge in graph.edgesFrom(start)) {
+                        dfsMarkComponents(graph, edge.to, components, compIdx)
+                    }
+                }
+
+            }
+        }
+
+
     }
 
     override fun solve(): Boolean {
@@ -190,12 +282,38 @@ class TheorySolverRDL : TheorySolver {
         return ModelRDL(assignment)
     }
 
+    fun getEqualVariables(): Set<Set<Variable>> {
+        assert(this.searchResult != null)
+        assert(this.graph != null)
+        val searchResult = this.searchResult!!
+        assert(!searchResult.hasNegativeCycle)
+        return EqGen(searchResult.d, graph!!).findEqualVariables()
+    }
+
     class EqGen(val delta: Map<ConstraintGraph.Node, Double>, val graph: ConstraintGraph) {
+        /**
+         * Equality Generation for Difference Constraints
+         */
+        fun findEqualVariables(): Set<Set<Variable>> {
+            val edgesWithZeroSlack = graph.edges.filter { sl(it) == 0.0 }.toSet() // (i) E'
+            val inducedSubgraph = ConstraintGraph.InducedGraph.create(graph, edgesWithZeroSlack) // (ii) G'
+            val componentsRaw = ConstraintGraph.SCC.search(inducedSubgraph) // (iii) SCCs
 
-        fun findEqualVariables() {
-            val edgesWithZeroSlack = graph.edges.filter { sl(it) == 0.0 } // E'
+            // (iv) group by {x in SCC and delta(x)==d}
+            val components = componentsRaw.keys.groupBy { componentsRaw.getValue(it) }
+            val variableEqualities: MutableSet<Set<Variable>> = mutableSetOf()
+            for ((_, comp) in components) {
+                val groupsWithEqualDelta = mutableListOf<List<ConstraintGraph.Node>>()
+                val groups = comp.groupBy { delta.getValue(it) } // group of nodes in same SCC with equal delta
+                // (v) generate equalities
+                for (g in groups.values) {
+                    if (g.size >= 2) {
+                        variableEqualities += g.map { node -> node.variable }.toSet()
+                    }
+                }
+            }
 
-
+            return variableEqualities
         }
 
         /**

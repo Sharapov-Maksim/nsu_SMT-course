@@ -242,4 +242,9 @@ class TheorySolverUF : TheorySolver {
         state.addAssert(term)
     }
 
+
+    fun addFunction(function: UninterpretedFunction) {
+        state.addFunction(function)
+    }
+
 }

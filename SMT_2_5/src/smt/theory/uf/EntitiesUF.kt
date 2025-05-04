@@ -1,10 +1,11 @@
 package smt.theory.uf
 
 import smt.theory.Sort
+import smt.theory.Type
 import java.util.*
 
 
-data class UninterpretedFunction(val name: String, val args: List<Sort>, val result: Sort) {
+data class UninterpretedFunction(val name: String, val args: List<Type>, val result: Type) {
     override fun toString(): String {
         return "Function (\"$name\" $args -> $result)"
     }
