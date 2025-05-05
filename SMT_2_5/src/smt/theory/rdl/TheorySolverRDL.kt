@@ -25,17 +25,19 @@ class TheorySolverRDL : TheorySolver {
         /**
          * Nodes contained in graph.
          */
-        val nodes: MutableMap<Variable, Node> = mutableMapOf()
+        private val nodes: MutableMap<Variable, Node> = mutableMapOf()
         /**
          * Edges contained in graph.
          */
-        val edges: MutableSet<Edge> = mutableSetOf()
+        private val edges: MutableSet<Edge> = mutableSetOf()
 
         init { // add root node at graph creation
             nodes[rootVariable] = Node(rootVariable)
         }
 
         open fun edgesFrom(n: Node): Set<Edge> = n.edges
+        open fun nodes() = nodes
+        open fun edges() = edges
 
         /**
          * Graph induced by subset of edges.
@@ -44,8 +46,8 @@ class TheorySolverRDL : TheorySolver {
 
             companion object {
                 fun create(baseGraph: ConstraintGraph, edgesInduced: Set<Edge>): InducedGraph {
-                    if (!baseGraph.edges.containsAll(edgesInduced)) {
-                        throw IllegalArgumentException("Wrong edges subset, $edgesInduced is not subset of ${baseGraph.edges}")
+                    if (!baseGraph.edges().containsAll(edgesInduced)) {
+                        throw IllegalArgumentException("Wrong edges subset, $edgesInduced is not subset of ${baseGraph.edges()}")
                     }
                     return InducedGraph(baseGraph, edgesInduced)
                 }
@@ -58,6 +60,9 @@ class TheorySolverRDL : TheorySolver {
                 return baseGraph.edgesFrom(n).filter { edgesInduced.contains(it) }.toSet()
             }
 
+            override fun nodes(): MutableMap<Variable, Node> = baseGraph.nodes()
+            override fun edges(): MutableSet<Edge> = baseGraph.edges()
+
         }
 
         /**
@@ -66,7 +71,10 @@ class TheorySolverRDL : TheorySolver {
          * @see SCC
          */
         class InvertedGraph(val baseGraph: ConstraintGraph): ConstraintGraph() {
-            private val edgesInverted = baseGraph.edges.map { e -> Edge(e.to, e.from, e.w) }.toSet()
+            private val edgesInverted = baseGraph.edges().map { e -> Edge(e.to, e.from, e.w) }.toSet()
+
+            override fun nodes(): MutableMap<Variable, Node> = baseGraph.nodes()
+            override fun edges(): MutableSet<Edge> = baseGraph.edges()
 
             override fun edgesFrom(n: Node): Set<Edge> {
                 return edgesInverted.filter { it.from == n }.toSet()
@@ -74,6 +82,7 @@ class TheorySolverRDL : TheorySolver {
         }
 
         private val rootNode = nodes.getValue(rootVariable)
+
 
 
         data class Node(public val variable: Variable) {
@@ -124,15 +133,12 @@ class TheorySolverRDL : TheorySolver {
              */
             fun search(source: Node): SearchResult {
                 val d: MutableMap<Node, Double> = mutableMapOf()
-                /*if (d.isNotEmpty()) {
-                    d = mutableMapOf()
-                }*/
-                for (v in graph.nodes.values) {
+                for (v in graph.nodes().values) {
                     d[v] = Double.MAX_VALUE;
                 }
                 d[source] = 0.0
 
-                for (i in 0 ..< graph.nodes.size - 1) {
+                for (i in 0 ..< graph.nodes().size - 1) {
                     optimizeDistances(d)
                 }
 
@@ -149,7 +155,7 @@ class TheorySolverRDL : TheorySolver {
              */
             private fun optimizeDistances(d: MutableMap<Node, Double>): Boolean {
                 var changed = false
-                for (e in graph.edges) {
+                for (e in graph.edges()) {
                     val w = e.from
                     val v = e.to
                     val weight = e.w
@@ -179,7 +185,7 @@ class TheorySolverRDL : TheorySolver {
                     val ord = ArrayDeque<Node>() // order in which DFS1 finishes traversal
                     val visited = mutableSetOf<Node>()
 
-                    for (node in graph.nodes.values) {
+                    for (node in graph.nodes().values) {
                         dfsWithOrder(graph, node, visited, ord)
                     }
 
@@ -215,7 +221,9 @@ class TheorySolverRDL : TheorySolver {
                     components[start] = compIdx
 
                     for (edge in graph.edgesFrom(start)) {
-                        dfsMarkComponents(graph, edge.to, components, compIdx)
+                        if (!components.containsKey(edge.to)) {
+                            dfsMarkComponents(graph, edge.to, components, compIdx)
+                        }
                     }
                 }
 
@@ -243,7 +251,7 @@ class TheorySolverRDL : TheorySolver {
         }
 
         if (DEBUG_LOG) {
-            println("[Info] RDL graph constructed: ${graph.nodes.values}")
+            println("[Info] RDL graph constructed: ${graph.nodes().values}")
         }
 
         val searchResult = graph.searchShortestPathsFromRoot()
@@ -295,7 +303,7 @@ class TheorySolverRDL : TheorySolver {
          * Equality Generation for Difference Constraints
          */
         fun findEqualVariables(): Set<Set<Variable>> {
-            val edgesWithZeroSlack = graph.edges.filter { sl(it) == 0.0 }.toSet() // (i) E'
+            val edgesWithZeroSlack = graph.edges().filter { sl(it) == 0.0 }.toSet() // (i) E'
             val inducedSubgraph = ConstraintGraph.InducedGraph.create(graph, edgesWithZeroSlack) // (ii) G'
             val componentsRaw = ConstraintGraph.SCC.search(inducedSubgraph) // (iii) SCCs
 

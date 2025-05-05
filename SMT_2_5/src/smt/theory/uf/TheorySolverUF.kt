@@ -247,4 +247,7 @@ class TheorySolverUF : TheorySolver {
         state.addFunction(function)
     }
 
+
+    fun getFunction(name: String) = state.getFunction(name)
+
 }

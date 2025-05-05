@@ -18,7 +18,7 @@ import smt.theory.uf.UninterpretedFunction
 import java.io.File
 
 
-const val DEBUG_LOG = false
+const val DEBUG_LOG = true
 
 fun readFileDirectlyAsText(fileName: String): String
         = File(fileName).readText(Charsets.UTF_8)
@@ -116,8 +116,10 @@ private fun interpretScript(script: SMTScript) {
                 } else {
                     // add variable to both UF and RDL
                     val res = TheorySolverRDL.type(command.res)
-                    rdl().addVariable(Variable(command.name, res))
+                    val variableRDL = Variable(command.name, res)
+                    rdl().addVariable(variableRDL)
                     uf().addFunction(UninterpretedFunction(command.name, emptyList(), res))
+                    ufrdl().addEqualitiesUF(listOf(variableRDL, variableRDL)) // variable is equal to itself
                 }
             }
             is SMTCommand.CmdSetLogic -> {
@@ -147,6 +149,7 @@ private fun interpretScript(script: SMTScript) {
                 }
                 val model = rdl().getModel()
                 println(TheorySolverRDL.modelToString(model))
+                TODO()
             }
 
             else -> TODO()

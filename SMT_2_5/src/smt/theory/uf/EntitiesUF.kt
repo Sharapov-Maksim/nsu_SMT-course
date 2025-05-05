@@ -44,6 +44,12 @@ open class Term {
             return Objects.hash(f, super.hashCode())
         }
 
+        override fun toString(): String {
+            var res = "(${f.name} "
+            args.forEach { res += it; res += " " }
+            res += ")"
+            return res
+        }
     }
 
     class EqualityFunctionApplication private constructor(val isEqual: Boolean, override val args: List<Term>): FunctionApplication(args) {
@@ -60,6 +66,18 @@ open class Term {
 
         override fun hashCode(): Int {
             return Objects.hash(isEqual, super.hashCode())
+        }
+
+        override fun toString(): String {
+            var res = ""
+            if (isEqual) {
+                res += "(= "
+            } else {
+                res += "(distinct "
+            }
+            args.forEach { res += it; res += " " }
+            res += ")"
+            return res
         }
 
         companion object {
