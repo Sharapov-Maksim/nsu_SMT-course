@@ -119,6 +119,6 @@ class TheorySolverUFRDL(val uf: TheorySolverUF, val rdl: TheorySolverRDL): Theor
     }
 
     override fun getModel(): Model {
-        TODO("Not yet implemented")
+        return rdl().getModel2()
     }
 }

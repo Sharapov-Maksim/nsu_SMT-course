@@ -3,11 +3,14 @@ package smt.theory.rdl
 import smt.DEBUG_LOG
 import smt.parser.Expression
 import smt.theory.*
+import smt.theory.rdl.TheorySolverRDL.ConstraintGraph.Edge
+import smt.theory.rdl.TheorySolverRDL.ConstraintGraph.Node
 
 class TheorySolverRDL : TheorySolver {
 
     private val state = State()
     var graph: ConstraintGraph? = null
+    var inducedGraph: ConstraintGraph.InducedGraph? = null
     var searchResult: ConstraintGraph.SingleSourceShortestPath.SearchResult? = null
 
     class State {
@@ -20,6 +23,9 @@ class TheorySolverRDL : TheorySolver {
     open class ConstraintGraph() {
         companion object {
             val rootVariable = Variable("ROOT", Void)
+
+            fun edge(u: Node, v: Node) =
+                u.edges.filter { e -> e.from == u && e.to == v }[0]
         }
 
         /**
@@ -230,6 +236,39 @@ class TheorySolverRDL : TheorySolver {
             }
         }
 
+        class SCCGraph() {
+
+            public val nodes: MutableMap<Int, SCCNode> = mutableMapOf()
+
+            data class SCCNode(val component: Set<Node>, val id: Int) {
+                val edges: MutableSet<SCCEdge> = mutableSetOf()
+
+                override fun toString(): String {
+                    return "SCC#${id} (${component.map { it.variable.name }.toList()}) ($edges)"
+                }
+            }
+
+            data class SCCEdge(val from: SCCNode, val to: SCCNode) {
+                override fun toString(): String {
+                    return "#${from.id} ---> #${to.id}"
+                }
+            }
+
+            fun addNode(component: Set<Node>, id: Int) {
+                assert(!nodes.containsKey(id))
+                nodes[id] = SCCNode(component, id)
+            }
+
+            fun addEdge(from: SCCNode, to: SCCNode) {
+                val edge = SCCEdge(from, to)
+                from.edges.add(edge)
+            }
+
+            override fun toString(): String {
+                return "SCCGraph(${nodes.values})"
+            }
+        }
+
 
     }
 
@@ -264,6 +303,9 @@ class TheorySolverRDL : TheorySolver {
 
         this.graph = graph
         this.searchResult = searchResult
+        if (sat) {
+            inducedGraph = EqGen(searchResult.d, graph).inducedGraph()
+        }
 
         return sat
     }
@@ -290,6 +332,38 @@ class TheorySolverRDL : TheorySolver {
         return ModelRDL(assignment)
     }
 
+    fun getModel2(): ModelRDL {
+        assert(this.searchResult != null)
+        assert(this.graph != null)
+        assert(this.inducedGraph != null)
+
+        val componentsRaw = ConstraintGraph.SCC.search(inducedGraph!!)
+        val components = componentsRaw.keys.groupBy { componentsRaw.getValue(it) }
+
+        val sccGraph= ConstraintGraph.SCCGraph()
+        for ((id, comp) in components) {
+            sccGraph.addNode(comp.toSet(), id)
+        }
+
+        val sccMap: MutableMap<Node, ConstraintGraph.SCCGraph.SCCNode> = mutableMapOf()
+        for (node in graph!!.nodes().values) {
+            val sccFiltered = sccGraph.nodes.values.filter { sccNode: ConstraintGraph.SCCGraph.SCCNode -> sccNode.component.contains(node) }
+            assert(sccFiltered.size == 1)
+            val scc = sccFiltered.first()
+            sccMap[node] = scc
+        }
+
+        for (edge in graph!!.edges()) {
+            sccGraph.addEdge(sccMap.getValue(edge.from), sccMap.getValue(edge.to))
+        }
+
+        if (DEBUG_LOG) {
+            println("SCC Graph: $sccGraph")
+        }
+
+        TODO()
+    }
+
     fun getEqualVariables(): Set<Set<Variable>> {
         assert(this.searchResult != null)
         assert(this.graph != null)
@@ -298,20 +372,19 @@ class TheorySolverRDL : TheorySolver {
         return EqGen(searchResult.d, graph!!).findEqualVariables()
     }
 
-    class EqGen(val delta: Map<ConstraintGraph.Node, Double>, val graph: ConstraintGraph) {
+    class EqGen(val delta: Map<Node, Double>, val graph: ConstraintGraph) {
         /**
          * Equality Generation for Difference Constraints
          */
         fun findEqualVariables(): Set<Set<Variable>> {
-            val edgesWithZeroSlack = graph.edges().filter { sl(it) == 0.0 }.toSet() // (i) E'
-            val inducedSubgraph = ConstraintGraph.InducedGraph.create(graph, edgesWithZeroSlack) // (ii) G'
+            val inducedSubgraph = inducedGraph() // (i) (ii) G'
             val componentsRaw = ConstraintGraph.SCC.search(inducedSubgraph) // (iii) SCCs
 
             // (iv) group by {x in SCC and delta(x)==d}
             val components = componentsRaw.keys.groupBy { componentsRaw.getValue(it) }
             val variableEqualities: MutableSet<Set<Variable>> = mutableSetOf()
             for ((_, comp) in components) {
-                val groupsWithEqualDelta = mutableListOf<List<ConstraintGraph.Node>>()
+                val groupsWithEqualDelta = mutableListOf<List<Node>>()
                 val groups = comp.groupBy { delta.getValue(it) } // group of nodes in same SCC with equal delta
                 // (v) generate equalities
                 for (g in groups.values) {
@@ -324,19 +397,21 @@ class TheorySolverRDL : TheorySolver {
             return variableEqualities
         }
 
+        public fun inducedGraph(): ConstraintGraph.InducedGraph {
+            val edgesWithZeroSlack = graph.edges().filter { sl(it) == 0.0 }.toSet() // (i) E'
+            val inducedSubgraph = ConstraintGraph.InducedGraph.create(graph, edgesWithZeroSlack) // (ii) G'
+            return inducedSubgraph
+        }
+
         /**
          * Slack function.
          */
-        private fun sl(u: ConstraintGraph.Node, v: ConstraintGraph.Node): Double =
-            delta.getValue(u) - delta.getValue(v) + edge(u, v).w
+        private fun sl(u: Node, v: Node): Double =
+            delta.getValue(u) - delta.getValue(v) + ConstraintGraph.edge(u, v).w
 
         private fun sl(edge: ConstraintGraph.Edge) = sl(edge.from, edge.to)
 
-        private fun edge(u: ConstraintGraph.Node, v: ConstraintGraph.Node) =
-            u.edges.filter { e -> e.from == u && e.to == v }[0]
-
     }
-
 
     fun addVariable(variable: Variable) {
         state.variables[variable.name] = variable

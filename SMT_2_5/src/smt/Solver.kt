@@ -142,13 +142,13 @@ private fun interpretScript(script: SMTScript) {
                 }
             }
             is SMTCommand.CmdGetModel -> {
-                val sat = rdl().solve()
+                val sat = ufrdl().solve()
                 if (!sat) {
                     println("Could not find model values for unsatisfied model")
                     continue
                 }
-                val model = rdl().getModel()
-                println(TheorySolverRDL.modelToString(model))
+                val model = ufrdl().getModel()
+                println("")
                 TODO()
             }
 
