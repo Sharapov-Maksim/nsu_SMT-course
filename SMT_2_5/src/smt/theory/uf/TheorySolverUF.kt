@@ -6,6 +6,8 @@ import smt.theory.Model
 import smt.theory.TheorySolver.Companion.EMPTY_LOGIC
 import smt.theory.Sort
 import smt.theory.TheorySolver
+import smt.theory.rdl.Variable
+import smt.theory.ufrdl.ModelUFRDL
 
 class TheorySolverUF : TheorySolver {
 
@@ -89,9 +91,13 @@ class TheorySolverUF : TheorySolver {
     }
 
     override fun getModel(): Model {
+        TODO("Not yet implemented")
+    }
+
+    fun getModel(assignmentRDL: MutableMap<Variable, Double>): ModelUFRDL {
         state.assertsCongruenceClosure()
         assert(dag != null)
-        val model = findModel(dag!!)
+        val model = findModel(dag!!, assignmentRDL)
         return model
     }
 
@@ -131,7 +137,7 @@ class TheorySolverUF : TheorySolver {
         return dag
     }
 
-    private fun findModel(dag: CongruenceClosure.DAG): ModelUF {
+    private fun findModel(dag: CongruenceClosure.DAG, assignmentRDL: MutableMap<Variable, Double>): ModelUFRDL {
         val classes = dag.congruenceClasses()
         val classesWithId = mutableMapOf<Int, MutableSet<Term>>()
         // make an identifier for each congruence class
@@ -160,12 +166,29 @@ class TheorySolverUF : TheorySolver {
 
         val colors = g.color()
 
-        assert(state.sorts.size == 1) // for now only single sort is supported
+        assert(state.sorts.isEmpty()) // sorts are unsupported in UFRDL
 
         val variables = state.functions.values.filter { f -> f.args.isEmpty() } // variables are 0-ary functions
-        val classIdToValuesMap = colors.mapValues { (_, color) -> ModelUF.SortValue(color) }
+        var maxPredefined = colors.values.filterIsInstance<GraphColoring.ColorPredefined>()
+            .maxOfOrNull { it.value }?: 0.0
 
-        val model = ModelUF(classIdToValuesMap.values.toSet())
+        // associate colors with unique Real values
+        val colorIdToValue = colors.values.filterIsInstance<GraphColoring.ColorUnique>()
+            .map { it.id }.toSet()
+            .associateWith { maxPredefined + it + 1.0 }
+
+        val classIdToValuesMap = colors.mapValues { (_, color) ->
+            if (color is GraphColoring.ColorPredefined) {
+                color.value
+            } else if (color is GraphColoring.ColorUnique) {
+                colorIdToValue.getValue(color.id)
+            } else {
+                throw IllegalArgumentException("Invalid color $color")
+            }
+
+        }
+
+        val model = ModelUFRDL()
 
         var height = 1 // variables have height of 1
         while (true) {
@@ -193,7 +216,7 @@ class TheorySolverUF : TheorySolver {
             classesBecameEmpty.forEach { id -> classesWithId.remove(id) }
 
             if (classesWithId.isEmpty()) {
-                // nothing left for futher processing
+                // nothing left for further processing
                 break
             }
 
@@ -222,6 +245,19 @@ class TheorySolverUF : TheorySolver {
         return varClasses
     }
 
+    public fun variableInequalityPairs(): Set<Pair<UninterpretedFunction, UninterpretedFunction>> {
+        val res: MutableSet<Pair<UninterpretedFunction, UninterpretedFunction>> = mutableSetOf()
+        for (neq in inequalities()) {
+            val left = neq.args[0] as Term.NamedFunctionApplication
+            val right = neq.args[1] as Term.NamedFunctionApplication
+            if (left.args.isEmpty() && right.args.isEmpty()) { // variables
+                res += (left.f to right.f)
+            }
+        }
+
+        return res
+    }
+
 
     private fun checkSat(dag: CongruenceClosure.DAG): Boolean {
         // check all inequalities
@@ -247,6 +283,10 @@ class TheorySolverUF : TheorySolver {
         state.addFunction(function)
     }
 
+    fun inequalities() = state.inequalities()
+    fun assertsCongruenceClosure() {
+        state.assertsCongruenceClosure()
+    }
 
     fun getFunction(name: String) = state.getFunction(name)
 

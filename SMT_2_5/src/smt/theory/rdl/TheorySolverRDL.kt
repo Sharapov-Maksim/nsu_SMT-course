@@ -1,6 +1,7 @@
 package smt.theory.rdl
 
 import smt.DEBUG_LOG
+import smt.env
 import smt.parser.Expression
 import smt.theory.*
 import smt.theory.rdl.TheorySolverRDL.ConstraintGraph.Edge
@@ -239,6 +240,7 @@ class TheorySolverRDL : TheorySolver {
         class SCCGraph() {
 
             public val nodes: MutableMap<Int, SCCNode> = mutableMapOf()
+            public val edges: MutableSet<SCCEdge> = mutableSetOf()
 
             data class SCCNode(val component: Set<Node>, val id: Int) {
                 val edges: MutableSet<SCCEdge> = mutableSetOf()
@@ -261,11 +263,36 @@ class TheorySolverRDL : TheorySolver {
 
             fun addEdge(from: SCCNode, to: SCCNode) {
                 val edge = SCCEdge(from, to)
+                edges.add(edge)
                 from.edges.add(edge)
             }
 
             override fun toString(): String {
                 return "SCCGraph(${nodes.values})"
+            }
+
+            fun topsort(): ArrayDeque<SCCNode> {
+                val result = ArrayDeque<SCCNode>()
+                val notVisited = nodes.values.toMutableSet()
+
+                fun visit(n: SCCNode) {
+                    assert(notVisited.remove(n))
+
+                    for (next in n.edges.map { it.to }) {
+                        if (notVisited.contains(next)) {
+                            visit(next)
+                        }
+                    }
+                    result.addFirst(n)
+                }
+
+                while (notVisited.isNotEmpty()) {
+                    val start = notVisited.first()
+
+                    visit(start)
+                }
+
+                return result
             }
         }
 
@@ -332,38 +359,6 @@ class TheorySolverRDL : TheorySolver {
         return ModelRDL(assignment)
     }
 
-    fun getModel2(): ModelRDL {
-        assert(this.searchResult != null)
-        assert(this.graph != null)
-        assert(this.inducedGraph != null)
-
-        val componentsRaw = ConstraintGraph.SCC.search(inducedGraph!!)
-        val components = componentsRaw.keys.groupBy { componentsRaw.getValue(it) }
-
-        val sccGraph= ConstraintGraph.SCCGraph()
-        for ((id, comp) in components) {
-            sccGraph.addNode(comp.toSet(), id)
-        }
-
-        val sccMap: MutableMap<Node, ConstraintGraph.SCCGraph.SCCNode> = mutableMapOf()
-        for (node in graph!!.nodes().values) {
-            val sccFiltered = sccGraph.nodes.values.filter { sccNode: ConstraintGraph.SCCGraph.SCCNode -> sccNode.component.contains(node) }
-            assert(sccFiltered.size == 1)
-            val scc = sccFiltered.first()
-            sccMap[node] = scc
-        }
-
-        for (edge in graph!!.edges()) {
-            sccGraph.addEdge(sccMap.getValue(edge.from), sccMap.getValue(edge.to))
-        }
-
-        if (DEBUG_LOG) {
-            println("SCC Graph: $sccGraph")
-        }
-
-        TODO()
-    }
-
     fun getEqualVariables(): Set<Set<Variable>> {
         assert(this.searchResult != null)
         assert(this.graph != null)
@@ -398,24 +393,30 @@ class TheorySolverRDL : TheorySolver {
         }
 
         public fun inducedGraph(): ConstraintGraph.InducedGraph {
-            val edgesWithZeroSlack = graph.edges().filter { sl(it) == 0.0 }.toSet() // (i) E'
+            val edgesWithZeroSlack = graph.edges().filter { env.solverRDL().sl(it) == 0.0 }.toSet() // (i) E'
             val inducedSubgraph = ConstraintGraph.InducedGraph.create(graph, edgesWithZeroSlack) // (ii) G'
             return inducedSubgraph
         }
 
-        /**
-         * Slack function.
-         */
-        private fun sl(u: Node, v: Node): Double =
-            delta.getValue(u) - delta.getValue(v) + ConstraintGraph.edge(u, v).w
 
-        private fun sl(edge: ConstraintGraph.Edge) = sl(edge.from, edge.to)
 
     }
+
+    /**
+     * Slack function.
+     */
+    public fun sl(u: Node, v: Node): Double {
+        assert(!searchResult!!.hasNegativeCycle)
+        val delta = searchResult!!.d
+        return delta.getValue(u) - delta.getValue(v) + ConstraintGraph.edge(u, v).w
+    }
+    fun sl(edge: Edge) = sl(edge.from, edge.to)
 
     fun addVariable(variable: Variable) {
         state.variables[variable.name] = variable
     }
+
+    fun variables() = state.variables.toMap()
 
     fun addAssert(function: LEQ_Apply) {
         state.asserts.add(function)
