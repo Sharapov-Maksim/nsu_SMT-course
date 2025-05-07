@@ -27,7 +27,7 @@ fun readFileDirectlyAsText(fileName: String): String
 
 fun main(args: Array<String>) {
     if (args.isEmpty()) {
-        println("Usage: SMT_2_3 <file_path>.smt2")
+        println("Usage: SMT_2_5 <file_path>.smt2")
         return
     }
 
