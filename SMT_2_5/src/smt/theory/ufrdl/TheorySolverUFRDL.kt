@@ -122,7 +122,7 @@ class TheorySolverUFRDL(val uf: TheorySolverUF, val rdl: TheorySolverRDL): Theor
         return Variable(term.f.name, Real)
     }
 
-    override fun getModel(): Model {
+    override fun getModel(): ModelUFRDL {
         assert(rdl().searchResult != null)
         val delta = rdl().searchResult!!.d
         val rdlG = rdl().graph!!
@@ -158,6 +158,9 @@ class TheorySolverUFRDL(val uf: TheorySolverUF, val rdl: TheorySolverRDL): Theor
         val neqRelation: MutableMap<ConstraintGraph.SCCGraph.SCCNode, MutableSet<ConstraintGraph.SCCGraph.SCCNode>> =
             mutableMapOf()
         uf().assertsCongruenceClosure()
+
+        sccSorted.forEach{ neqRelation.putIfAbsent(it, mutableSetOf()) }
+
         for ((x, y) in uf().variableInequalityPairs()) {
             val xvar = rdl().variables().getValue(x.name)
             val yvar = rdl().variables().getValue(y.name)
@@ -165,10 +168,11 @@ class TheorySolverUFRDL(val uf: TheorySolverUF, val rdl: TheorySolverRDL): Theor
             val ynode = rdl().graph!!.nodes().getValue(yvar)
             val xSCC = sccMap.getValue(xnode)
             val ySCC = sccMap.getValue(ynode)
-            neqRelation.putIfAbsent(xSCC, mutableSetOf())
-            neqRelation.putIfAbsent(ySCC, mutableSetOf())
             neqRelation.getValue(xSCC) += ySCC
             neqRelation.getValue(ySCC) += xSCC
+        }
+        if (DEBUG_LOG) {
+            println("   Neq relation: $neqRelation")
         }
 
         // model generation algorithm
@@ -195,6 +199,8 @@ class TheorySolverUFRDL(val uf: TheorySolverUF, val rdl: TheorySolverRDL): Theor
 
             // (iv) new values for variables according to UF and RDL constraints
             deltaPatched = delta.mapValues { (node, d) -> d - gamma.getValue(sccMap.getValue(node)) }
+        } else {
+            assert(uf().variableInequalityPairs().isEmpty())
         }
 
         val d = deltaPatched.mapKeys { (node, _) -> node.variable }
@@ -217,6 +223,9 @@ class TheorySolverUFRDL(val uf: TheorySolverUF, val rdl: TheorySolverRDL): Theor
         return model
     }
 
+    /**
+     * TODO discuss a problem if x != y, x-y<=0, d(x)==0, d(y)==0
+     */
     private fun findEpsilon(rdlG: ConstraintGraph): Double {
         var min = Double.MAX_VALUE
         val delta = rdl.searchResult?.d!!

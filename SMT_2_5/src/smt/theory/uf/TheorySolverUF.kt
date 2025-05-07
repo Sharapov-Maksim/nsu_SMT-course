@@ -3,6 +3,7 @@ package smt.theory.uf
 import smt.DEBUG_LOG
 import smt.parser.Expression
 import smt.theory.Model
+import smt.theory.Real
 import smt.theory.TheorySolver.Companion.EMPTY_LOGIC
 import smt.theory.Sort
 import smt.theory.TheorySolver
@@ -48,9 +49,9 @@ class TheorySolverUF : TheorySolver {
 
 
         fun addAssert(term: Term.EqualityFunctionApplication) {
-            if (asserts.contains(term)) {
+            /*if (asserts.contains(term)) {
                 throw IllegalArgumentException("Term $term was already added")
-            }
+            }*/
             asserts.add(term)
         }
 
@@ -145,10 +146,27 @@ class TheorySolverUF : TheorySolver {
             classesWithId[id] = cls.toMutableSet()
         }
 
+        val classesWithVariables =
+            classes.filter { it.any { it is Term.NamedFunctionApplication && it.args.isEmpty() } }
+        classesWithVariables.map { it.filter { it is Term.NamedFunctionApplication && it.args.isEmpty() }.toSet() }.forEach { cls ->
+            val v = cls.first() as Term.NamedFunctionApplication
+            val assignment = assignmentRDL.getValue(Variable(v.f.name, Real))
+            assert(cls.all { assignmentRDL.getValue(Variable((it as Term.NamedFunctionApplication).f.name, Real)) == assignment })
+        }
+        val clsToValue = classesWithVariables.associateWith { terms ->
+            val v = (terms.filter { it is Term.NamedFunctionApplication && it.args.isEmpty() }
+                .first() as Term.NamedFunctionApplication)
+            val assignment = assignmentRDL.getValue(Variable(v.f.name, Real))
+            assignment
+        }
         // build graph of congruence classes and color it
         val g = GraphColoring.Graph()
-        for ((id, _) in classesWithId) {
-            g.addNode(id)
+        for ((id, cls) in classesWithId) {
+            if (clsToValue.containsKey(cls)) {
+                g.addNode(id, clsToValue.getValue(cls))
+            } else {
+                g.addNode(id)
+            }
         }
         for (neq in state.inequalities()) {
             val left = neq.args[0]

@@ -15,6 +15,7 @@ import smt.theory.rdl.LEQ_Apply
 import smt.theory.rdl.TheorySolverRDL
 import smt.theory.uf.Term
 import smt.theory.uf.UninterpretedFunction
+import smt.theory.ufrdl.ModelPrinter
 import java.io.File
 
 
@@ -148,8 +149,7 @@ private fun interpretScript(script: SMTScript) {
                     continue
                 }
                 val model = ufrdl().getModel()
-                println("")
-                TODO()
+                ModelPrinter.printModel(model)
             }
 
             else -> TODO()

@@ -21,11 +21,20 @@ class GraphColoring {
 
         data class Node(val id: Int, val edges: MutableSet<Node>) {
             var color: Color = ColorUnknown
+
+            public constructor(id: Int, edges: MutableSet<Node>, value: Double): this(id, edges) {
+                color = ColorPredefined(value)
+            }
         }
 
         fun addNode(id: Int) {
             assert(!nodes.containsKey(id)) // check that no node with given id exists in graph
             nodes[id] = Node(id, mutableSetOf())
+        }
+
+        fun addNode(id: Int, value: Double) {
+            assert(!nodes.containsKey(id)) // check that no node with given id exists in graph
+            nodes[id] = Node(id, mutableSetOf(), value)
         }
 
         fun addEdge(id0: Int, id1: Int) {
