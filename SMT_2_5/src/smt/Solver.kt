@@ -19,7 +19,7 @@ import smt.theory.ufrdl.ModelPrinter
 import java.io.File
 
 
-const val DEBUG_LOG = true
+const val DEBUG_LOG = false
 
 fun readFileDirectlyAsText(fileName: String): String
         = File(fileName).readText(Charsets.UTF_8)

@@ -178,9 +178,6 @@ class TheorySolverUFRDL(val uf: TheorySolverUF, val rdl: TheorySolverRDL): Theor
         // model generation algorithm
         var deltaPatched = delta
         var epsilon = findEpsilon(rdlG) // (i)
-        /*if (DEBUG_LOG) {
-            println("   epsilon: $epsilon")
-        }*/
         if (epsilon != Double.MAX_VALUE) {
             val gamma = sccGraph.nodes.values.associateWith { 0.0 }.toMutableMap() // (ii)
             for (S in sccSorted) { // (iii)
@@ -200,7 +197,8 @@ class TheorySolverUFRDL(val uf: TheorySolverUF, val rdl: TheorySolverRDL): Theor
             // (iv) new values for variables according to UF and RDL constraints
             deltaPatched = delta.mapValues { (node, d) -> d - gamma.getValue(sccMap.getValue(node)) }
         } else {
-            assert(uf().variableInequalityPairs().isEmpty())
+            // TODO workaround this by assigning epsilon some value
+            assert(uf().variableInequalityPairs().isEmpty(), { "Could not find epsilon value but some variables are distinct" })
         }
 
         val d = deltaPatched.mapKeys { (node, _) -> node.variable }
@@ -224,7 +222,10 @@ class TheorySolverUFRDL(val uf: TheorySolverUF, val rdl: TheorySolverRDL): Theor
     }
 
     /**
-     * TODO discuss a problem if x != y, x-y<=0, d(x)==0, d(y)==0
+     * Find epsilon for model generaion algorithm.
+     * <br>
+     * Note: there is a problem if x != y, x-y<=0, d(x)==0, d(y)==0.
+     * Epsilon could not be found but some variables should be distinct.
      */
     private fun findEpsilon(rdlG: ConstraintGraph): Double {
         var min = Double.MAX_VALUE
